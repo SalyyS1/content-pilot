@@ -147,3 +147,12 @@ export function startDashboard(options = {}) {
 }
 
 export default { startDashboard };
+
+// Auto-start when run directly
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith('server.js') ||
+  process.argv[1].includes('dashboard')
+);
+if (isMain) {
+  startDashboard();
+}
