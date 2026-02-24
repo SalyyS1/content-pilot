@@ -1,0 +1,13 @@
+﻿
+ΓÜÖ∩╕Å Configuration
+
+  Upload Interval:   5 min
+  Max Uploads/Day:   50
+  Download Dir:      C:\Users\Salyyy\.gemini\antigravity\scratch\downloads
+  Data Dir:          C:\Users\Salyyy\.gemini\antigravity\scratch\data
+  Dashboard:         http://localhost:3000
+  Auto-Pilot:        Disabled
+  AP Interval:       10 min
+  AP Categories:     entertainment, music, gaming, comedy
+  AP Region:         VN
+

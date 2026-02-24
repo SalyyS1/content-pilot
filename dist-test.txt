@@ -1,0 +1,72 @@
+﻿.\dist\video-reup.exe
+ : pkg/prelude/bootst
+rap.js:1861
+At line:1 char:1
++ .\dist\video-reup.e
+xe --help 2>&1 | 
+Out-File 
+dist-test.txt 
+-Encoding  ...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (pkg/pre   
+ lude/bootstrap.j    
+s:1861:String) [    
+], RemoteExcepti    
+on
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+      throw error;
+      ^
+
+TypeError [ERR_INVALI
+D_ARG_TYPE]: The 
+"path" argument must 
+be of type string or 
+an instance of URL. 
+Received undefined
+    at fileURLToPath 
+(node:internal/url:14
+87:11)
+    at C:\snapshot\vi
+deo-reup-tool\build\c
+li.cjs:25:5092
+    at C:\snapshot\vi
+deo-reup-tool\build\c
+li.cjs:2:212
+    at 
+Object.<anonymous> (C
+:\snapshot\video-reup
+-tool\build\cli.cjs:2
+36:133)
+    at 
+Module._compile (pkg/
+prelude/bootstrap.js:
+1919:22)
+    at Module._extens
+ions..js (node:intern
+al/modules/cjs/loader
+:1623:10)
+    at Module.load (n
+ode:internal/modules/
+cjs/loader:1266:32)
+    at Module._load (
+node:internal/modules
+/cjs/loader:1091:12)
+    at 
+Module.require (node:
+internal/modules/cjs/
+loader:1289:19)
+    at 
+Module.require (pkg/p
+relude/bootstrap.js:1
+840:31) {
+  code: 'ERR_INVALID_
+ARG_TYPE'
+}
+
+Node.js v20.20.0

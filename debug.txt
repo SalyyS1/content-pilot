@@ -1,0 +1,6 @@
+﻿ERROR: Error: options.stream is required.
+    at new Stream (C:\Users\Salyyy\.gemini\antigravity\scratch\video-reup-tool\node_modules\winston\lib\winston\transports\stream.js:30:13)
+    at file:///C:/Users/Salyyy/.gemini/antigravity/scratch/video-reup-tool/src/core/logger.js:24:25
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:660:26)
+    at async file:///C:/Users/Salyyy/.gemini/antigravity/scratch/video-reup-tool/[eval1]:1:7

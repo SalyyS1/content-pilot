@@ -1,0 +1,24 @@
+﻿.\dist\video-reup.exe : pkg/prelude/bootstrap.js:423
+At line:1 char:1
++ .\dist\video-reup.exe config 2>&1 | Out-String -Width 200 | Out-File  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo              : NotSpe    cified: (pkg/pre    lude/bootstrap.j    s:423:String) []    , RemoteExceptio    n
+    + FullyQualified    ErrorId : Native    CommandError
+ 
+  if (error) throw error;
+             ^
+
+Error: Cannot mkdir in a snapshot. Try mountpoints instead.
+    at mkdirFailInSnapshot (pkg/prelude/bootstrap.js:1618:7)
+    at mkdirSync (pkg/prelude/bootstrap.js:1630:12)
+    at C:\snapshot\video-reup-tool\build\video-reup.cjs
+    at Array.forEach (<anonymous>)
+    at WJe (C:\snapshot\video-reup-tool\build\video-reup.cjs)
+    at C:\snapshot\video-reup-tool\build\video-reup.cjs
+    at C:\snapshot\video-reup-tool\build\video-reup.cjs
+    at Object.<anonymous> (C:\snapshot\video-reup-tool\build\video-reup.cjs)
+    at Module._compile (pkg/prelude/bootstrap.js:1919:22)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+
+Node.js v20.20.0
+

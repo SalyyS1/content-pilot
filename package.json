@@ -1,0 +1,36 @@
+{
+  "name": "video-reup-tool",
+  "version": "1.0.0",
+  "description": "Auto reup YouTube Shorts & Facebook Reels with trending detection",
+  "type": "module",
+  "main": "src/cli/index.js",
+  "bin": {
+    "video-reup": "./src/cli/index.js"
+  },
+  "scripts": {
+    "start": "node src/cli/index.js",
+    "dashboard": "node src/cli/index.js dashboard",
+    "autopilot": "node src/cli/index.js autopilot",
+    "dev": "node --watch src/dashboard/server.js",
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "better-sqlite3": "^11.0.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "googleapis": "^144.0.0",
+    "ora": "^8.0.0",
+    "playwright": "^1.48.0",
+    "winston": "^3.14.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

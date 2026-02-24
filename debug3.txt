@@ -1,0 +1,13 @@
+﻿2026-02-24 21:33:23 [[32MINFO[39M] Database initialized at C:\Users\Salyyy\.gemini\antigravity\scratch\video-reup-tool\data\reup.db
+
+≡ƒôè Video Reup Status
+
+  Videos Downloaded: 0
+  Total Uploads:     0
+  Published:         0
+  Pending:           0
+  Failed:            0
+  Today:             0 / 50
+  Accounts:          0
+  Active Jobs:       0
+

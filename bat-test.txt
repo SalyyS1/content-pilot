@@ -1,0 +1,23 @@
+﻿Usage: video-reup [options] [command]
+
+≡ƒÄ¼ Auto Reup YouTube Shorts & Facebook Reels
+
+Options:
+  -V, --version                     output the version number
+  -h, --help                        display help for command
+
+Commands:
+  download [options] <url>          Download a YouTube Short video
+  download-channel [options] <url>  Download Shorts from a YouTube channel
+  download-trending [options]       Download trending YouTube Shorts
+  upload                            Upload videos
+  reup [options] <url>              Download a video and reup to platforms
+  batch [options] <file>            Batch reup from a text file (one URL per
+                                    line)
+  auth                              Authentication management
+  autopilot [options]               ≡ƒÜÇ Start auto-pilot mode (trending ΓåÆ
+                                    download ΓåÆ reup)
+  dashboard [options]               ≡ƒôè Open web dashboard
+  status                            Show current status and stats
+  config                            Show current configuration
+  help [command]                    display help for command
