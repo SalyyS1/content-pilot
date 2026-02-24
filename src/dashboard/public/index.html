@@ -1,819 +1,116 @@
-<!doctype html>
-<html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Video Reup Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <!-- Toast Notifications -->
-    <div class="toast-container" id="toastContainer"></div>
-
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
-          <span class="logo-icon">🎬</span>
-          <span class="logo-text">Video Reup</span>
-        </div>
-        <span class="version">v2.0</span>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReupVideo Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1>📊 ReupVideo</h1>
+        <span class="badge" id="status-badge">Loading...</span>
       </div>
+      <div class="header-right">
+        <span id="clock"></span>
+      </div>
+    </header>
 
-      <nav class="nav">
-        <span class="nav-label">Main</span>
-        <a class="nav-item active" data-page="dashboard" href="#">
-          <span class="nav-icon">📊</span>
-          <span>Dashboard</span>
-        </a>
-        <a class="nav-item" data-page="autopilot" href="#">
-          <span class="nav-icon">🚀</span>
-          <span>Auto-Pilot</span>
-        </a>
-        <a class="nav-item" data-page="uploads" href="#">
-          <span class="nav-icon">📤</span>
-          <span>Uploads</span>
-          <span class="nav-badge" id="navPendingBadge" style="display:none">0</span>
-        </a>
-
-        <div class="nav-divider"></div>
-        <span class="nav-label">Tools</span>
-        <a class="nav-item" data-page="reup" href="#">
-          <span class="nav-icon">🔄</span>
-          <span>Reup Manual</span>
-        </a>
-        <a class="nav-item" data-page="analytics" href="#">
-          <span class="nav-icon">📈</span>
-          <span>Analytics</span>
-        </a>
-        <a class="nav-item" data-page="accounts" href="#">
-          <span class="nav-icon">👤</span>
-          <span>Accounts</span>
-        </a>
-
-        <div class="nav-divider"></div>
-        <span class="nav-label">System</span>
-        <a class="nav-item" data-page="logs" href="#">
-          <span class="nav-icon">📋</span>
-          <span>Logs</span>
-        </a>
-        <a class="nav-item" data-page="settings" href="#">
-          <span class="nav-icon">⚙️</span>
-          <span>Settings</span>
-        </a>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="status-badge" id="autoPilotBadge">
-          <span class="status-dot offline"></span>
-          <span>Auto-Pilot Off</span>
+    <!-- Overview Cards -->
+    <section class="cards" id="overview-cards">
+      <div class="card">
+        <div class="card-icon">📹</div>
+        <div class="card-info">
+          <span class="card-value" id="today-uploads">-</span>
+          <span class="card-label">Today</span>
         </div>
       </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main">
-      <!-- Header -->
-      <header class="header">
-        <h1 id="pageTitle">Dashboard</h1>
-        <div class="header-actions">
-          <span class="clock" id="clock"></span>
+      <div class="card">
+        <div class="card-icon">📅</div>
+        <div class="card-info">
+          <span class="card-value" id="week-uploads">-</span>
+          <span class="card-label">This Week</span>
         </div>
-      </header>
-
-      <!-- Pages -->
-      <div class="content">
-
-        <!-- ============================================ -->
-        <!-- Dashboard Page                               -->
-        <!-- ============================================ -->
-        <div class="page active" id="page-dashboard">
-          <!-- Quick Actions -->
-          <div class="quick-actions">
-            <button class="quick-action qa-primary" onclick="switchPage('autopilot')">
-              <span class="qa-icon">🚀</span>Auto-Pilot
-            </button>
-            <button class="quick-action qa-success" onclick="switchPage('reup')">
-              <span class="qa-icon">🔄</span>Quick Reup
-            </button>
-            <button class="quick-action" onclick="switchPage('uploads')">
-              <span class="qa-icon">📤</span>Upload History
-            </button>
-            <button class="quick-action qa-warning" onclick="switchPage('analytics')">
-              <span class="qa-icon">📈</span>Analytics
-            </button>
-          </div>
-
-          <!-- Stats Grid -->
-          <div class="stats-grid">
-            <div class="stat-card gradient-blue">
-              <div class="stat-icon">📥</div>
-              <div class="stat-info">
-                <span class="stat-value" id="stat-videos">0</span>
-                <span class="stat-label">Videos Downloaded</span>
-              </div>
-            </div>
-            <div class="stat-card gradient-green">
-              <div class="stat-icon">✅</div>
-              <div class="stat-info">
-                <span class="stat-value" id="stat-published">0</span>
-                <span class="stat-label">Published</span>
-              </div>
-            </div>
-            <div class="stat-card gradient-yellow">
-              <div class="stat-icon">⏳</div>
-              <div class="stat-info">
-                <span class="stat-value" id="stat-pending">0</span>
-                <span class="stat-label">Pending</span>
-              </div>
-            </div>
-            <div class="stat-card gradient-red">
-              <div class="stat-icon">❌</div>
-              <div class="stat-info">
-                <span class="stat-value" id="stat-failed">0</span>
-                <span class="stat-label">Failed</span>
-              </div>
-            </div>
-            <div class="stat-card gradient-purple">
-              <div class="stat-icon">📅</div>
-              <div class="stat-info">
-                <span class="stat-value" id="stat-today">0</span>
-                <span class="stat-label">Today Uploads</span>
-              </div>
-            </div>
-            <div class="stat-card gradient-teal">
-              <div class="stat-icon">👤</div>
-              <div class="stat-info">
-                <span class="stat-value" id="stat-accounts">0</span>
-                <span class="stat-label">Accounts</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Two-column layout: Activity + Health -->
-          <div class="grid-2">
-            <!-- Activity Feed -->
-            <div class="panel">
-              <div class="panel-header">
-                <h3>⚡ Activity Feed</h3>
-                <button class="btn btn-sm btn-ghost" onclick="loadRecentUploads()">🔄 Refresh</button>
-              </div>
-              <div class="activity-feed" id="activityFeed">
-                <div class="empty-state">
-                  <div class="empty-state-icon">📭</div>
-                  <div class="empty-state-text">No activity yet</div>
-                  <div class="empty-state-sub">Start reup to see activity here</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- System Health -->
-            <div class="panel">
-              <h3>🔧 System Health</h3>
-              <div class="health-items" id="healthItems">
-                <div class="health-item">
-                  <span class="health-dot healthy"></span>
-                  <span class="health-label">Database</span>
-                  <span class="health-value" id="healthDb">Connected</span>
-                </div>
-                <div class="health-item">
-                  <span class="health-dot" id="healthYtDot"></span>
-                  <span class="health-label">YouTube Auth</span>
-                  <span class="health-value" id="healthYt">Unknown</span>
-                </div>
-                <div class="health-item">
-                  <span class="health-dot" id="healthFbDot"></span>
-                  <span class="health-label">Facebook Auth</span>
-                  <span class="health-value" id="healthFb">Unknown</span>
-                </div>
-                <div class="health-item">
-                  <span class="health-dot" id="healthApDot"></span>
-                  <span class="health-label">Auto-Pilot</span>
-                  <span class="health-value" id="healthAp">Stopped</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent Uploads Table -->
-          <div class="panel">
-            <div class="panel-header">
-              <h3>📋 Recent Uploads</h3>
-            </div>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Platform</th>
-                    <th>Title</th>
-                    <th>Status</th>
-                    <th>Account</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody id="recentUploads"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Auto-Pilot Page                              -->
-        <!-- ============================================ -->
-        <div class="page" id="page-autopilot">
-          <div class="panel">
-            <h3>🚀 Auto-Pilot Control</h3>
-            <div class="autopilot-controls">
-              <div class="ap-status-card">
-                <div class="ap-status-indicator">
-                  <span class="ap-dot"></span>
-                  <span class="ap-status-text" id="apStatusText">Stopped</span>
-                </div>
-                <div class="ap-stats">
-                  <div><strong>Sessions:</strong> <span id="apSessions">0</span></div>
-                  <div><strong>Downloaded:</strong> <span id="apDownloaded">0</span></div>
-                  <div><strong>Uploaded:</strong> <span id="apUploaded">0</span></div>
-                  <div><strong>Last Run:</strong> <span id="apLastRun">-</span></div>
-                </div>
-              </div>
-
-              <div class="ap-actions">
-                <button class="btn btn-primary btn-lg" id="btnApStart" onclick="apControl('start')">
-                  ▶️ Start
-                </button>
-                <button class="btn btn-warning" id="btnApPause" onclick="apControl('pause')" disabled>
-                  ⏸️ Pause
-                </button>
-                <button class="btn btn-danger" id="btnApStop" onclick="apControl('stop')" disabled>
-                  ⏹️ Stop
-                </button>
-              </div>
-
-              <div class="ap-config">
-                <h4>Configuration</h4>
-                <div class="settings-grid">
-                  <div class="form-group">
-                    <label>Interval (minutes)</label>
-                    <input type="number" id="apInterval" value="10" min="1" max="120" />
-                  </div>
-                  <div class="form-group">
-                    <label>Categories</label>
-                    <input type="text" id="apCategories" value="entertainment,music,gaming,comedy" placeholder="Comma-separated" />
-                  </div>
-                  <div class="form-group">
-                    <label>Target Platforms</label>
-                    <div class="checkbox-group">
-                      <label><input type="checkbox" id="apYoutube" checked /> YouTube</label>
-                      <label><input type="checkbox" id="apFacebook" checked /> Facebook</label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Uploads Page                                 -->
-        <!-- ============================================ -->
-        <div class="page" id="page-uploads">
-          <div class="panel">
-            <div class="panel-header">
-              <h3>📤 Upload History</h3>
-              <div class="filters">
-                <select id="filterStatus" onchange="loadUploads()">
-                  <option value="">All Status</option>
-                  <option value="published">Published</option>
-                  <option value="pending">Pending</option>
-                  <option value="uploading">Uploading</option>
-                  <option value="failed">Failed</option>
-                </select>
-                <select id="filterPlatform" onchange="loadUploads()">
-                  <option value="">All Platforms</option>
-                  <option value="youtube">YouTube</option>
-                  <option value="facebook">Facebook</option>
-                </select>
-                <button class="btn btn-sm btn-ghost" onclick="exportData()">📥 Export CSV</button>
-              </div>
-            </div>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Platform</th>
-                    <th>Title</th>
-                    <th>Status</th>
-                    <th>Account</th>
-                    <th>Retries</th>
-                    <th>URL</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody id="uploadsList"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Manual Reup Page                             -->
-        <!-- ============================================ -->
-        <div class="page" id="page-reup">
-          <div class="panel">
-            <h3>🔄 Manual Reup</h3>
-            <div class="reup-form">
-              <div class="form-group">
-                <label>YouTube URL</label>
-                <input type="url" id="reupUrl" placeholder="https://youtube.com/shorts/..." class="input-lg" />
-              </div>
-              <div class="form-group">
-                <label>Video Title (for classification)</label>
-                <input type="text" id="reupTitle" placeholder="Paste original title here for SEO analysis..." />
-              </div>
-              <div class="form-group">
-                <label>Category (auto-detected or manual)</label>
-                <select id="reupCategory">
-                  <option value="">🤖 Auto-detect</option>
-                  <option value="gaming">🎮 Gaming</option>
-                  <option value="comedy">😂 Comedy</option>
-                  <option value="music">🎵 Music</option>
-                  <option value="food">🍜 Food / Cooking</option>
-                  <option value="tech">📱 Tech</option>
-                  <option value="beauty">💄 Beauty / Fashion</option>
-                  <option value="sports">⚽ Sports / Fitness</option>
-                  <option value="education">📚 Education</option>
-                  <option value="animals">🐶 Animals / Pets</option>
-                  <option value="travel">✈️ Travel</option>
-                  <option value="asmr">🎧 ASMR</option>
-                  <option value="news">📰 News</option>
-                  <option value="entertainment">🎬 Entertainment</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Format / Language Strategy</label>
-                <select id="reupFormat">
-                  <option value="youtube_shorts">🎬 YouTube Shorts — English (no dấu)</option>
-                  <option value="youtube_long">📺 YouTube Video Dài — Tiếng Việt (có dấu)</option>
-                  <option value="facebook_reels">📱 Facebook Reels — Tiếng Việt (có dấu)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Upload To</label>
-                <div class="checkbox-group">
-                  <label><input type="checkbox" id="reupYt" checked /> YouTube</label>
-                  <label><input type="checkbox" id="reupFb" checked /> Facebook</label>
-                </div>
-              </div>
-              <div style="display: flex; gap: 12px;">
-                <button class="btn btn-primary btn-lg" onclick="manualReup()" id="btnReup">
-                  🔄 Start Reup
-                </button>
-                <button class="btn btn-lg" onclick="previewSEO()" id="btnPreviewSEO" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3);">
-                  📈 Preview SEO
-                </button>
-              </div>
-              <div class="reup-result" id="reupResult"></div>
-            </div>
-          </div>
-
-          <!-- SEO Preview Panel -->
-          <div class="panel" id="seoPreviewPanel" style="display: none;">
-            <h3>📈 SEO Analysis</h3>
-            <div class="seo-preview-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-              <!-- Classification Badge -->
-              <div class="seo-box" style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                  <span style="font-size: 24px;" id="seoGenreIcon">🎬</span>
-                  <div>
-                    <div style="font-weight: 600; font-size: 16px; color: var(--text-primary);" id="seoGenreLabel">Entertainment</div>
-                    <div style="font-size: 11px; color: var(--text-muted);" id="seoContentType">Content type: unknown</div>
-                  </div>
-                </div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="seoSubGenres"></div>
-              </div>
-              <!-- SEO Score -->
-              <div class="seo-box" style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 16px; text-align: center;">
-                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">SEO Score</div>
-                <div style="font-size: 42px; font-weight: 700;" id="seoScoreValue">0</div>
-                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; margin-top: 8px;">
-                  <div id="seoScoreBar" style="height: 100%; border-radius: 3px; background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981); width: 0%; transition: width 0.6s ease;"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Optimized Title -->
-            <div style="margin-bottom: 16px;">
-              <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px;">📝 Optimized Title</div>
-              <div id="seoTitle" style="background: rgba(255,255,255,0.04); padding: 12px 16px; border-radius: 8px; font-size: 14px; color: var(--text-primary); border-left: 3px solid #8b5cf6;"></div>
-            </div>
-
-            <!-- Hashtags -->
-            <div style="margin-bottom: 16px;">
-              <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px;">🏷️ Hashtags (<span id="seoHashtagCount">0</span>)</div>
-              <div id="seoHashtags" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
-            </div>
-
-            <!-- Description Preview -->
-            <div>
-              <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px;">📄 Description Preview</div>
-              <div id="seoDescription" style="background: rgba(255,255,255,0.04); padding: 12px 16px; border-radius: 8px; font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; max-height: 200px; overflow-y: auto; line-height: 1.6;"></div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>📋 Batch Reup</h3>
-            <div class="form-group">
-              <label>Paste URLs (one per line)</label>
-              <textarea id="batchUrls" rows="6" placeholder="https://youtube.com/shorts/xxx&#10;https://youtube.com/shorts/yyy"></textarea>
-            </div>
-            <button class="btn btn-primary" onclick="batchReup()">📋 Start Batch</button>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Analytics Page (NEW)                         -->
-        <!-- ============================================ -->
-        <div class="page" id="page-analytics">
-          <!-- Success Rate + Platform Breakdown -->
-          <div class="grid-2">
-            <div class="panel">
-              <h3>🎯 Success Rate</h3>
-              <div class="rate-ring-container">
-                <div class="rate-ring">
-                  <svg viewBox="0 0 120 120">
-                    <circle class="rate-ring-bg" cx="60" cy="60" r="52" />
-                    <circle class="rate-ring-fill" id="rateRingFill" cx="60" cy="60" r="52"
-                      stroke="url(#ringGradient)"
-                      stroke-dasharray="326.73"
-                      stroke-dashoffset="326.73" />
-                    <defs>
-                      <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#10b981" />
-                        <stop offset="100%" stop-color="#22d3ee" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div class="rate-ring-text">
-                    <span class="rate-ring-value" id="rateValue">0%</span>
-                    <span class="rate-ring-label">Success</span>
-                  </div>
-                </div>
-                <div class="rate-details">
-                  <div class="rate-detail-item">
-                    <span class="rate-dot rd-success"></span>
-                    <span class="rate-detail-label">Published</span>
-                    <span class="rate-detail-value" id="ratePublished">0</span>
-                  </div>
-                  <div class="rate-detail-item">
-                    <span class="rate-dot rd-fail"></span>
-                    <span class="rate-detail-label">Failed</span>
-                    <span class="rate-detail-value" id="rateFailed">0</span>
-                  </div>
-                  <div class="rate-detail-item">
-                    <span class="rate-dot rd-pending"></span>
-                    <span class="rate-detail-label">Pending</span>
-                    <span class="rate-detail-value" id="ratePending">0</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="panel">
-              <h3>📊 Platform Breakdown</h3>
-              <div class="platform-breakdown" id="platformBreakdown">
-                <div class="platform-row">
-                  <span class="platform-icon">▶️</span>
-                  <span class="platform-label">YouTube</span>
-                  <div class="platform-bar-container">
-                    <div class="platform-bar-fill pb-youtube" id="barYoutube" style="width: 0%"></div>
-                  </div>
-                  <span class="platform-count" id="countYoutube">0</span>
-                </div>
-                <div class="platform-row">
-                  <span class="platform-icon">📘</span>
-                  <span class="platform-label">Facebook</span>
-                  <div class="platform-bar-container">
-                    <div class="platform-bar-fill pb-facebook" id="barFacebook" style="width: 0%"></div>
-                  </div>
-                  <span class="platform-count" id="countFacebook">0</span>
-                </div>
-              </div>
-              <div style="margin-top: 24px;">
-                <h3>📅 Upload Timeline (7 days)</h3>
-                <div class="chart-container" id="chartContainer">
-                  <!-- Populated by JS -->
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Accounts Page                                -->
-        <!-- ============================================ -->
-        <div class="page" id="page-accounts">
-          <!-- Account Overview -->
-          <div class="panel">
-            <div class="panel-header">
-              <h3>👤 Accounts & Rotation</h3>
-              <button class="btn btn-sm btn-primary" onclick="loadAccountOverview()">🔄 Refresh</button>
-            </div>
-            <div class="stats-row" id="accountStats" style="margin-bottom: 16px;">
-              <div class="stat-card" style="--accent: var(--primary)">
-                <div class="stat-value" id="accYtCount">0</div>
-                <div class="stat-label">YouTube Accounts</div>
-              </div>
-              <div class="stat-card" style="--accent: var(--secondary)">
-                <div class="stat-value" id="accFbCount">0</div>
-                <div class="stat-label">Facebook Accounts</div>
-              </div>
-              <div class="stat-card" style="--accent: var(--success)">
-                <div class="stat-value" id="accPageCount">0</div>
-                <div class="stat-label">FB Pages</div>
-              </div>
-            </div>
-            <div id="accountsList" class="accounts-list"></div>
-          </div>
-
-          <!-- Add FB Page -->
-          <div class="panel">
-            <h3>📄 Add Facebook Page</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>FB Account</label>
-                <select id="addPageAccount"></select>
-              </div>
-              <div class="form-group">
-                <label>Page ID</label>
-                <input type="text" id="addPageId" placeholder="123456789..." />
-              </div>
-              <div class="form-group">
-                <label>Page Name</label>
-                <input type="text" id="addPageName" placeholder="My Awesome Page" />
-              </div>
-              <div class="form-group">
-                <label>Page Access Token (optional)</label>
-                <input type="password" id="addPageToken" placeholder="EAA..." />
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="addFacebookPage()">➕ Add Page</button>
-          </div>
-
-          <!-- Rotation Config -->
-          <div class="panel">
-            <h3>🔄 Rotation Config</h3>
-            <p class="hint" style="margin-bottom: 12px;">Assign accounts to specific formats. E.g: YT Acc A → Shorts (EN), YT Acc B → Video Dài (VN)</p>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Account</label>
-                <select id="rotationAccount"></select>
-              </div>
-              <div class="form-group">
-                <label>Assigned Format</label>
-                <select id="rotationFormat">
-                  <option value="">🌐 All Formats (round-robin)</option>
-                  <option value="youtube_shorts">🎬 YouTube Shorts (EN)</option>
-                  <option value="youtube_long">📺 YouTube Video Dài (VN)</option>
-                  <option value="facebook_reels">📱 Facebook Reels (VN)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Daily Limit (0 = unlimited)</label>
-                <input type="number" id="rotationDailyLimit" value="0" min="0" />
-              </div>
-              <div class="form-group">
-                <label>Cooldown (minutes between uploads)</label>
-                <input type="number" id="rotationCooldown" value="0" min="0" />
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="saveRotationConfig()">💾 Save Rotation</button>
-          </div>
-
-          <!-- CLI Instructions -->
-          <div class="panel">
-            <h3>🔗 Add New Accounts (CLI)</h3>
-            <div class="accounts-actions">
-              <p class="hint">Add new accounts via CLI, then configure rotation here:</p>
-              <code>node src/cli/index.js auth login youtube</code><br />
-              <code>node src/cli/index.js auth login facebook</code>
-              <p class="hint" style="margin-top: 8px;">💡 Run the command multiple times to add more accounts!</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Logs Page                                    -->
-        <!-- ============================================ -->
-        <div class="page" id="page-logs">
-          <div class="panel panel-logs">
-            <div class="panel-header">
-              <h3>📋 Real-Time Logs</h3>
-              <div style="display: flex; gap: 8px;">
-                <button class="btn btn-sm btn-ghost" onclick="loadLogs()">🔄 Refresh</button>
-                <button class="btn btn-sm btn-ghost" onclick="clearLogsDisplay()">🗑️ Clear</button>
-              </div>
-            </div>
-            <pre class="log-viewer" id="logViewer"></pre>
-          </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- Settings Page                                -->
-        <!-- ============================================ -->
-        <div class="page" id="page-settings">
-          <div class="panel">
-            <h3>🔑 YouTube API</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Client ID</label>
-                <input type="text" id="s_youtube_client_id" placeholder="Google Cloud OAuth Client ID" />
-              </div>
-              <div class="form-group">
-                <label>Client Secret</label>
-                <input type="password" id="s_youtube_client_secret" placeholder="Client Secret" />
-              </div>
-              <div class="form-group">
-                <label>Redirect URI</label>
-                <input type="text" id="s_youtube_redirect_uri" placeholder="http://localhost:3001/auth/youtube/callback" />
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>📘 Facebook API</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>App ID</label>
-                <input type="text" id="s_facebook_app_id" placeholder="Meta App ID" />
-              </div>
-              <div class="form-group">
-                <label>App Secret</label>
-                <input type="password" id="s_facebook_app_secret" placeholder="App Secret" />
-              </div>
-              <div class="form-group">
-                <label>Page ID</label>
-                <input type="text" id="s_facebook_page_id" placeholder="Facebook Page ID" />
-              </div>
-              <div class="form-group">
-                <label>Page Access Token</label>
-                <input type="password" id="s_facebook_page_access_token" placeholder="Page Access Token" />
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>⚡ Rate Limiting</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Upload Interval (minutes)</label>
-                <input type="number" id="s_upload_interval_minutes" min="1" max="120" />
-              </div>
-              <div class="form-group">
-                <label>Max Uploads / Day</label>
-                <input type="number" id="s_max_uploads_per_day" min="1" max="500" />
-              </div>
-              <div class="form-group">
-                <label>Concurrent Downloads</label>
-                <input type="number" id="s_download_concurrent" min="1" max="10" />
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>📐 Download Limits</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Max Duration - YouTube (seconds)</label>
-                <input type="number" id="s_max_duration_youtube" min="30" max="600" />
-                <small>YouTube Shorts: khuyến nghị ≤ 180s (3 phút)</small>
-              </div>
-              <div class="form-group">
-                <label>Max Duration - Facebook (seconds)</label>
-                <input type="number" id="s_max_duration_facebook" min="30" max="3600" />
-                <small>Facebook Reels: có thể dài hơn, tối đa 15 phút</small>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>🚀 Auto-Pilot</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Cycle Interval (minutes)</label>
-                <input type="number" id="s_autopilot_interval_minutes" min="1" max="120" />
-              </div>
-              <div class="form-group">
-                <label>Max Videos / Session</label>
-                <input type="number" id="s_autopilot_max_videos" min="1" max="100" />
-              </div>
-              <div class="form-group">
-                <label>Categories (comma-separated)</label>
-                <input type="text" id="s_autopilot_categories" placeholder="entertainment,music,gaming,comedy" />
-              </div>
-              <div class="form-group">
-                <label>Region</label>
-                <input type="text" id="s_autopilot_region" placeholder="VN" maxlength="5" />
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>🎯 Target Platforms</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <div class="checkbox-group">
-                  <label><input type="checkbox" id="s_target_youtube" checked /> YouTube</label>
-                  <label><input type="checkbox" id="s_target_facebook" checked /> Facebook</label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>🔒 Transform Pipeline (Copyright Avoidance)</h3>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Mode</label>
-                <select id="s_transform_mode">
-                  <option value="auto">Auto (analyze risk → transform if needed)</option>
-                  <option value="always">Always (transform every video)</option>
-                  <option value="off">Off (no transforms)</option>
-                </select>
-              </div>
-            </div>
-
-            <h4 style="margin: 18px 0 10px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">📹 Video Transforms</h4>
-            <div class="settings-grid">
-              <div class="form-group">
-                <div class="checkbox-group">
-                  <label><input type="checkbox" id="s_transform_mirror" checked /> Mirror (Horizontal Flip)</label>
-                  <label><input type="checkbox" id="s_transform_crop" checked /> Crop + Zoom (4%)</label>
-                  <label><input type="checkbox" id="s_transform_color_grade" checked /> Color Grade</label>
-                  <label><input type="checkbox" id="s_transform_video_speed" /> Video Speed Change</label>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Video Speed Factor</label>
-                <input type="number" id="s_transform_video_speed_factor" min="0.9" max="1.15" step="0.01" value="1.05" />
-                <small>1.0 = bình thường, 1.05 = nhanh hơn 5%</small>
-              </div>
-            </div>
-
-            <h4 style="margin: 18px 0 10px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">🎵 Audio Transforms</h4>
-            <div class="settings-grid">
-              <div class="form-group">
-                <div class="checkbox-group">
-                  <label><input type="checkbox" id="s_transform_pitch_shift" checked /> Pitch Shift</label>
-                  <label><input type="checkbox" id="s_transform_audio_speed" checked /> Audio Speed Change</label>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Pitch Factor</label>
-                <input type="number" id="s_transform_pitch_factor" min="0.9" max="1.15" step="0.01" value="1.04" />
-                <small>1.04 = tăng 4% cao độ</small>
-              </div>
-              <div class="form-group">
-                <label>Audio Speed Factor</label>
-                <input type="number" id="s_transform_audio_speed_factor" min="0.9" max="1.15" step="0.01" value="1.03" />
-                <small>1.03 = nhanh hơn 3%</small>
-              </div>
-            </div>
-
-            <h4 style="margin: 18px 0 10px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">🎨 Color Settings</h4>
-            <div class="settings-grid">
-              <div class="form-group">
-                <label>Saturation</label>
-                <input type="number" id="s_transform_color_saturation" min="0.8" max="1.5" step="0.05" value="1.15" />
-              </div>
-              <div class="form-group">
-                <label>Contrast</label>
-                <input type="number" id="s_transform_color_contrast" min="0.8" max="1.3" step="0.02" value="1.08" />
-              </div>
-              <div class="form-group">
-                <label>Brightness</label>
-                <input type="number" id="s_transform_color_brightness" min="-0.1" max="0.1" step="0.01" value="0.03" />
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-actions">
-            <button class="btn btn-primary btn-lg" onclick="saveSettings()" id="btnSaveSettings">
-              💾 Save Settings
-            </button>
-            <span class="save-status" id="saveStatus"></span>
-          </div>
-        </div>
-
       </div>
-    </main>
+      <div class="card">
+        <div class="card-icon">👥</div>
+        <div class="card-info">
+          <span class="card-value" id="active-accounts">-</span>
+          <span class="card-label">Accounts</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon">💰</div>
+        <div class="card-info">
+          <span class="card-value" id="revenue-est">-</span>
+          <span class="card-label">Est. Revenue</span>
+        </div>
+      </div>
+    </section>
 
-    <script src="app.js"></script>
-  </body>
+    <!-- Account Health Gauges -->
+    <section class="panel">
+      <h2>🏥 Account Health</h2>
+      <div class="health-grid" id="health-grid">
+        <p class="muted">Loading health data...</p>
+      </div>
+    </section>
+
+    <!-- Upload Calendar Heatmap -->
+    <section class="panel">
+      <h2>📅 Upload Calendar</h2>
+      <div class="calendar-nav">
+        <button id="cal-prev">◀</button>
+        <span id="cal-month">Loading...</span>
+        <button id="cal-next">▶</button>
+      </div>
+      <div class="calendar-grid" id="calendar-grid"></div>
+      <div class="calendar-legend">
+        <span><span class="cal-dot" style="background:#1a1a2e"></span>0</span>
+        <span><span class="cal-dot" style="background:#16213e"></span>1-2</span>
+        <span><span class="cal-dot" style="background:#0f3460"></span>3-5</span>
+        <span><span class="cal-dot" style="background:#533483"></span>6-9</span>
+        <span><span class="cal-dot" style="background:#e94560"></span>10+</span>
+      </div>
+    </section>
+
+    <!-- Recent Uploads -->
+    <section class="panel">
+      <h2>📋 Recent Uploads</h2>
+      <div class="table-wrap">
+        <table id="uploads-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Platform</th>
+              <th>Account</th>
+              <th>Status</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="uploads-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Queue -->
+    <section class="panel">
+      <h2>⏳ Queue</h2>
+      <div id="queue-list" class="queue-list">
+        <p class="muted">No jobs in queue</p>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section class="panel">
+      <h2>📝 Live Logs</h2>
+      <div class="log-container" id="log-container"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
 </html>
