@@ -392,8 +392,10 @@ export class YouTubeDownloader {
   _runYtdlp(args, captureOutput = false) {
     return new Promise((resolve, reject) => {
       const proc = spawn(this.ytdlpPath, args, {
-        stdio: captureOutput ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
-        shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true,
       });
 
       let stdout = '';

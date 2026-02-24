@@ -138,9 +138,9 @@ export function startDashboard(options = {}) {
     res.sendFile(resolve(__dirname, 'public', 'index.html'));
   });
 
-  app.listen(port, () => {
-    logger.info(`📊 Dashboard running on port ${port}`);
-    console.log(`\n📊 Dashboard: http://localhost:${port}\n`);
+  app.listen(port, '0.0.0.0', () => {
+    logger.info(`📊 Dashboard running on http://0.0.0.0:${port}`);
+    console.log(`\n📊 Dashboard: http://0.0.0.0:${port}\n`);
   });
 
   return app;
