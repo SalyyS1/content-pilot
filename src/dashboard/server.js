@@ -86,70 +86,52 @@ function savePlaywrightSession(accountId, playwrightCookies) {
  * Uses multiple methods for reliability
  */
 async function validateFacebookCookies(cookieString) {
+  // Check mbasic.facebook.com with mobile UA (same as posting code) for accurate results
   const headers = {
     'Cookie': cookieString,
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml',
     'Accept-Language': 'en-US,en;q=0.9',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1',
   };
 
   try {
-    // Method 1: Check facebook.com main page (most reliable)
-    const res = await fetch('https://www.facebook.com/', {
+    const res = await fetch('https://mbasic.facebook.com/', {
       method: 'GET',
       headers,
-      redirect: 'manual',
+      redirect: 'follow',
     });
 
-    const status = res.status;
-    const location = res.headers.get('location') || '';
+    const body = await res.text();
 
-    // If redirected to login → cookies invalid
-    if (location.includes('/login') || location.includes('checkpoint')) {
-      return { valid: false, reason: `Redirected to login (cookie expired)` };
+    // Check for login page indicators
+    if (body.includes('/login') && body.includes('password')) {
+      return { valid: false, reason: 'Cookie expired — mbasic redirected to login' };
     }
 
-    // 302 to another FB page = valid
-    if (status === 302 && location.includes('facebook.com') && !location.includes('login')) {
-      return { valid: true, redirect: location, name: null };
+    // Check for checkpoint
+    if (body.includes('checkpoint') || body.includes('/checkpoint/')) {
+      return { valid: false, reason: 'Account checkpointed — requires verification' };
     }
 
-    // 200 = we got the main page = logged in
-    if (status === 200) {
-      const body = await res.text();
-      // Check if login form is present (not logged in)
-      if (body.includes('login_form') || body.includes('/login/')) {
-        return { valid: false, reason: 'Login page returned (cookie expired)' };
-      }
-      // Try to extract name
-      const nameMatch = body.match(/"NAME":"([^"]+)"/i) || body.match(/title>([^<]+)<\/title/);
-      const name = nameMatch ? nameMatch[1].replace(/\s*[|\-–].*/g, '').trim() : null;
-      return { valid: true, name };
+    // Check for fb_dtsg (means we're logged in and can post)
+    const hasDtsg = body.match(/name="fb_dtsg"\s+value="([^"]+)"/);
+    if (hasDtsg) {
+      const nameMatch = body.match(/<title>([^<]+)<\/title>/);
+      const name = nameMatch ? nameMatch[1].trim() : null;
+      return { valid: true, name, canPost: true };
     }
 
-    // Method 2: If main page failed, try the Graph API endpoint
-    if (status >= 400) {
-      const c_user = cookieString.match(/c_user=(\d+)/)?.[1];
-      if (c_user) {
-        // c_user cookie exists and was parsed = likely valid (soft check)
-        return { valid: true, name: null, softCheck: true };
-      }
+    // Logged in but no composer form visible
+    if (res.ok && !body.includes('/login')) {
+      return { valid: true, name: null, canPost: false };
     }
 
-    return { valid: false, reason: `HTTP ${status}` };
+    return { valid: false, reason: `HTTP ${res.status} — could not verify` };
   } catch (err) {
-    // Network error but c_user exists → allow as soft-valid
-    const c_user = cookieString.match(/c_user=(\d+)/)?.[1];
-    if (c_user) {
-      return { valid: true, name: null, softCheck: true };
-    }
-    return { valid: false, reason: err.message };
+    return { valid: false, reason: `Network error: ${err.message}` };
   }
 }
+
 
 // === NEW: Phase 7 ===
 import { AnalyticsAPI } from './analytics-api.js';
