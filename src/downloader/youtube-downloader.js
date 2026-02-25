@@ -38,7 +38,12 @@ export class YouTubeDownloader {
 
   _getRandomProxy() {
     if (this._proxies.length === 0) return null;
-    return this._proxies[Math.floor(Math.random() * this._proxies.length)];
+    const raw = this._proxies[Math.floor(Math.random() * this._proxies.length)];
+    // Detect protocol by port number
+    const port = parseInt(raw.split(':')[1], 10);
+    const socksPort = [1080, 1081, 1082, 4145, 4153, 5678, 9050, 9051, 10801, 50161];
+    const proto = socksPort.includes(port) ? 'socks5' : 'http';
+    return `${proto}://${raw}`;
   }
 
   /**
@@ -424,10 +429,10 @@ export class YouTubeDownloader {
         fullArgs.unshift('--cookies', cookieFile);
       }
 
-      // Add random proxy from pool (SOCKS5)
+      // Add random proxy from pool
       const proxy = this._getRandomProxy();
       if (proxy) {
-        fullArgs.unshift('--proxy', `socks5://${proxy}`);
+        fullArgs.unshift('--proxy', proxy);
         if (!captureOutput) logger.debug(`🌐 Using proxy: ${proxy}`);
       }
 

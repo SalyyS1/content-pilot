@@ -184,10 +184,24 @@ FORMAT:
 
 IMPORTANT: ONLY return the title and story. No labels like "Part 1" or "Title:". Just the raw story.`;
 
-    const result = await this.ai.chatgpt(prompt, { temperature: 0.85 })
-      || await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
+    let result = null;
 
-    if (!result) return null;
+    // Try ChatGPT first
+    if (this.ai.hasChatGPT) {
+      logger.info('🤖 Trying ChatGPT for story...');
+      result = await this.ai.chatgpt(prompt, { temperature: 0.85 });
+    }
+
+    // Fallback to Gemini
+    if (!result && this.ai.hasGemini) {
+      logger.info('✨ ChatGPT unavailable, trying Gemini...');
+      result = await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
+    }
+
+    if (!result) {
+      logger.warn('Both ChatGPT and Gemini failed to generate story');
+      return null;
+    }
 
     // Parse title from first line
     const lines = result.trim().split('\n');
@@ -217,8 +231,15 @@ REQUIREMENTS:
 FORMAT: Just write the story continuation. No title needed. No "Part 2" label.
 IMPORTANT: ONLY return the story text. No meta commentary.`;
 
-    return await this.ai.chatgpt(prompt, { temperature: 0.85 })
-      || await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
+    let result = null;
+    if (this.ai.hasChatGPT) {
+      result = await this.ai.chatgpt(prompt, { temperature: 0.85 });
+    }
+    if (!result && this.ai.hasGemini) {
+      logger.info('✨ Trying Gemini for Part 2...');
+      result = await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
+    }
+    return result;
   }
 
   _summarizePart1(body) {
