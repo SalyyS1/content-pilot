@@ -846,15 +846,15 @@ function updateStatusPosterUI(status) {
 
   if (status.running) {
     panel.classList.add('running');
-    badge.textContent = 'RUNNING';
+    badge.textContent = 'WRITING';
     badge.classList.add('running');
-    btn.textContent = '⏹ Tắt Status';
+    btn.textContent = '⏹ Stop Writing';
     btn.classList.add('running');
   } else {
     panel.classList.remove('running');
     badge.textContent = 'OFF';
     badge.classList.remove('running');
-    btn.textContent = '▶ Bật Status';
+    btn.textContent = '▶ Start Writing';
     btn.classList.remove('running');
   }
 
@@ -863,13 +863,13 @@ function updateStatusPosterUI(status) {
     const el = (id) => document.getElementById(id);
     if (el('sp-posted')) el('sp-posted').textContent = s.totalPosted || 0;
     if (el('sp-failed')) el('sp-failed').textContent = s.totalFailed || 0;
-    if (el('sp-quotes')) el('sp-quotes').textContent = s.quotesAvailable || '150+';
+    if (el('sp-quotes')) el('sp-quotes').textContent = s.storiesCompleted || 0;
     if (el('sp-last')) el('sp-last').textContent = s.lastPostedAt ? timeAgo(s.lastPostedAt) : '—';
 
-    // Show last quote
+    // Show current story info
     const quoteEl = el('sp-last-quote');
-    if (quoteEl && s.lastQuote) {
-      quoteEl.textContent = `"…${s.lastQuote}"`;
+    if (quoteEl && s.lastStoryTitle) {
+      quoteEl.textContent = `📖 "${s.lastStoryTitle}" — ${s.currentGenre || ''} (Part ${s.currentPart || '?'}/2)`;
       quoteEl.style.display = 'block';
     }
   }

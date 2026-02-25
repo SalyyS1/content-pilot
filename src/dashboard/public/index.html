@@ -235,44 +235,42 @@
           </div>
         </section>
 
-        <!-- Status Đạo Lý Panel -->
+        <!-- Story Writer Panel -->
         <section class="panel autopilot-panel status-poster-panel" id="status-poster-panel">
           <div class="panel-header">
-            <h2>📝 Status Đạo Lý</h2>
+            <h2>📖 Story Writer</h2>
             <div style="display:flex;align-items:center;gap:10px">
               <span class="badge" id="sp-badge">OFF</span>
-              <button class="btn btn-primary" id="sp-toggle-btn" onclick="toggleStatusPoster()">▶ Bật Status</button>
+              <button class="btn btn-primary" id="sp-toggle-btn" onclick="toggleStatusPoster()">▶ Start Writing</button>
             </div>
           </div>
           <div class="autopilot-body">
             <div class="autopilot-stats">
               <div class="autopilot-stat">
                 <span class="autopilot-stat-value" id="sp-posted">0</span>
-                <span class="autopilot-stat-label">Đã đăng</span>
+                <span class="autopilot-stat-label">Posted</span>
               </div>
               <div class="autopilot-stat">
                 <span class="autopilot-stat-value" id="sp-failed">0</span>
-                <span class="autopilot-stat-label">Thất bại</span>
+                <span class="autopilot-stat-label">Failed</span>
               </div>
               <div class="autopilot-stat">
-                <span class="autopilot-stat-value" id="sp-quotes">150+</span>
-                <span class="autopilot-stat-label">Quotes</span>
+                <span class="autopilot-stat-value" id="sp-quotes">0</span>
+                <span class="autopilot-stat-label">Stories</span>
               </div>
               <div class="autopilot-stat">
                 <span class="autopilot-stat-value" id="sp-last">—</span>
-                <span class="autopilot-stat-label">Lần cuối</span>
+                <span class="autopilot-stat-label">Last Post</span>
               </div>
             </div>
             <div class="autopilot-config">
               <label>
                 <span>Interval</span>
                 <select id="sp-interval">
-                  <option value="1">1 giờ</option>
-                  <option value="2">2 giờ</option>
-                  <option value="3" selected>3 giờ</option>
-                  <option value="4">4 giờ</option>
-                  <option value="6">6 giờ</option>
-                  <option value="12">12 giờ</option>
+                  <option value="6">6 hours</option>
+                  <option value="8">8 hours</option>
+                  <option value="10">10 hours</option>
+                  <option value="12" selected>12 hours</option>
                 </select>
               </label>
             </div>
