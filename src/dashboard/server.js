@@ -155,12 +155,14 @@ async function validateFacebookCookies(cookieString) {
 import { AnalyticsAPI } from './analytics-api.js';
 import { AutoPilot } from '../autopilot/autopilot.js';
 import { FacebookStatusPoster } from '../uploader/facebook-status-poster.js';
+import { FacebookAutoReply } from '../uploader/facebook-auto-reply.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Singleton instances
 let autopilotInstance = null;
 let statusPosterInstance = null;
+let autoReplyInstance = null;
 
 /**
  * Dashboard Server (Upgraded)
@@ -435,6 +437,55 @@ export function startDashboard(options = {}) {
       statusPosterInstance.stop();
       logger.info('⏹️ Status Poster stopped from dashboard');
       res.json({ message: '⏹️ Status Poster đã tắt', running: false });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // === AUTO-REPLY Control endpoints ===
+
+  app.get('/api/auto-reply/status', (req, res) => {
+    try {
+      if (!autoReplyInstance) {
+        return res.json({ running: false, stats: null });
+      }
+      const status = autoReplyInstance.getStatus();
+      res.json({ running: !!status.isRunning, stats: status });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/auto-reply/start', (req, res) => {
+    try {
+      if (autoReplyInstance && autoReplyInstance.isRunning) {
+        return res.json({ message: 'Auto-Reply đang chạy rồi!', running: true });
+      }
+
+      const { intervalMinutes = 30, maxReplies = 5 } = req.body || {};
+
+      autoReplyInstance = new FacebookAutoReply({
+        intervalMinutes: parseInt(intervalMinutes),
+        maxReplies: parseInt(maxReplies),
+      });
+
+      autoReplyInstance.start();
+      logger.info(`💬 Auto-Reply started from dashboard (interval: ${intervalMinutes}min)`);
+      res.json({ message: '💬 Auto-Reply đã bật!', running: true });
+    } catch (error) {
+      logger.error(`Auto-Reply start error: ${error.message}`);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/auto-reply/stop', (req, res) => {
+    try {
+      if (!autoReplyInstance || !autoReplyInstance.isRunning) {
+        return res.json({ message: 'Auto-Reply chưa chạy', running: false });
+      }
+      autoReplyInstance.stop();
+      logger.info('⏹️ Auto-Reply stopped from dashboard');
+      res.json({ message: '⏹️ Auto-Reply đã tắt', running: false });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

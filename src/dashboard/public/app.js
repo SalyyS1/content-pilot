@@ -154,6 +154,7 @@ async function loadAll() {
     loadQueue(),
     loadAutopilotStatus(),
     loadStatusPosterStatus(),
+    loadAutoReplyStatus(),
   ]);
 
   lastUpdateTime = Date.now();
@@ -900,4 +901,86 @@ async function toggleStatusPoster() {
   }
 }
 
+// =============================================
+//  AUTO-REPLY CONTROLS
+// =============================================
+let autoReplyRunning = false;
 
+async function loadAutoReplyStatus() {
+  try {
+    const status = await api('/api/auto-reply/status');
+    autoReplyRunning = !!status.running;
+    updateAutoReplyUI(status);
+  } catch {
+    // API not ready yet
+  }
+}
+
+function updateAutoReplyUI(status) {
+  const panel = document.getElementById('auto-reply-panel');
+  const badge = document.getElementById('ar-badge');
+  const btn = document.getElementById('ar-toggle-btn');
+  if (!panel || !badge || !btn) return;
+
+  if (status.running) {
+    panel.classList.add('running');
+    badge.textContent = 'RUNNING';
+    badge.classList.add('running');
+    btn.textContent = '\u23f9 T\u1eaft Reply';
+    btn.classList.add('running');
+  } else {
+    panel.classList.remove('running');
+    badge.textContent = 'OFF';
+    badge.classList.remove('running');
+    btn.textContent = '\u25b6 B\u1eadt Reply';
+    btn.classList.remove('running');
+  }
+
+  if (status.stats) {
+    const s = status.stats;
+    const el = (id) => document.getElementById(id);
+    if (el('ar-replied')) el('ar-replied').textContent = s.totalReplied || 0;
+    if (el('ar-scanned')) el('ar-scanned').textContent = s.totalScanned || 0;
+    if (el('ar-ai')) el('ar-ai').textContent = s.aiReplies || 0;
+    if (el('ar-last')) el('ar-last').textContent = s.lastRepliedAt ? timeAgo(s.lastRepliedAt) : '\u2014';
+
+    const replyEl = el('ar-last-reply');
+    if (replyEl && s.lastReply) {
+      replyEl.textContent = `\u201c${s.lastReply}\u201d`;
+      replyEl.style.display = 'block';
+    }
+  }
+
+  const sel1 = document.getElementById('ar-interval');
+  const sel2 = document.getElementById('ar-max');
+  if (sel1) sel1.disabled = status.running;
+  if (sel2) sel2.disabled = status.running;
+}
+
+async function toggleAutoReply() {
+  const btn = document.getElementById('ar-toggle-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    if (autoReplyRunning) {
+      const res = await api('/api/auto-reply/stop', { method: 'POST' });
+      showToast(res.message || 'Auto-Reply \u0111\u00e3 t\u1eaft', 'info');
+    } else {
+      const intervalMinutes = parseInt(document.getElementById('ar-interval')?.value || '30');
+      const maxReplies = parseInt(document.getElementById('ar-max')?.value || '5');
+
+      const res = await api('/api/auto-reply/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intervalMinutes, maxReplies }),
+      });
+      showToast(res.message || 'Auto-Reply \u0111\u00e3 b\u1eadt!', 'success');
+    }
+    await loadAutoReplyStatus();
+  } catch (error) {
+    showToast('L\u1ed7i: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}

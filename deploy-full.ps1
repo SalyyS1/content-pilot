@@ -53,6 +53,7 @@ $files = @(
     "src/uploader/facebook-uploader.js",
     "src/uploader/youtube-uploader.js",
     "src/uploader/facebook-status-poster.js",
+    "src/uploader/facebook-auto-reply.js",
 
     # Autopilot
     "src/autopilot/autopilot.js",
@@ -104,7 +105,8 @@ foreach ($f in $files) {
     try {
         Invoke-WebRequest -Uri $url -OutFile $outPath -ErrorAction Stop
         Write-Host " OK" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host " FAIL" -ForegroundColor Red
         $errors += $f
     }

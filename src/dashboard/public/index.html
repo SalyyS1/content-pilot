@@ -281,6 +281,58 @@
           </div>
         </section>
 
+        <!-- Auto-Reply Comment Panel -->
+        <section class="panel autopilot-panel auto-reply-panel" id="auto-reply-panel">
+          <div class="panel-header">
+            <h2>💬 Auto-Reply Comment</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="badge" id="ar-badge">OFF</span>
+              <button class="btn btn-primary" id="ar-toggle-btn" onclick="toggleAutoReply()">▶ Bật Reply</button>
+            </div>
+          </div>
+          <div class="autopilot-body">
+            <div class="autopilot-stats">
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ar-replied">0</span>
+                <span class="autopilot-stat-label">Đã reply</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ar-scanned">0</span>
+                <span class="autopilot-stat-label">Đã scan</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ar-ai">0</span>
+                <span class="autopilot-stat-label">AI Reply</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ar-last">—</span>
+                <span class="autopilot-stat-label">Lần cuối</span>
+              </div>
+            </div>
+            <div class="autopilot-config">
+              <label>
+                <span>Scan mỗi</span>
+                <select id="ar-interval">
+                  <option value="15">15 phút</option>
+                  <option value="30" selected>30 phút</option>
+                  <option value="60">1 giờ</option>
+                  <option value="120">2 giờ</option>
+                </select>
+              </label>
+              <label>
+                <span>Max reply/lần</span>
+                <select id="ar-max">
+                  <option value="3">3 replies</option>
+                  <option value="5" selected>5 replies</option>
+                  <option value="10">10 replies</option>
+                </select>
+              </label>
+            </div>
+            <div id="ar-last-reply" style="margin-top:12px;padding:10px;border-radius:8px;background:var(--bg-hover);font-size:13px;color:var(--text-secondary);font-style:italic;display:none">
+            </div>
+          </div>
+        </section>
+
         <!-- 2-col grid: Health + Calendar -->
         <div class="dashboard-grid">
           <section class="panel">
