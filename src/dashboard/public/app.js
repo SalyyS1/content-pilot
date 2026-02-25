@@ -715,8 +715,13 @@ async function checkAIStatus() {
 // =============================================
 //  HELPERS
 // =============================================
-async function api(url) {
-  const res = await fetch(API_BASE + url);
+async function api(url, options = {}) {
+  const res = await fetch(API_BASE + url, options);
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    // Not JSON (likely SPA fallback HTML) — return null silently
+    return null;
+  }
   if (!res.ok) throw new Error(res.statusText);
   return res.json();
 }
