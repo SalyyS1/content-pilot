@@ -391,8 +391,15 @@ export class YouTubeDownloader {
 
   _runYtdlp(args, captureOutput = false) {
     return new Promise((resolve, reject) => {
-      // Inject JS runtime flag to avoid 'No supported JavaScript runtime' error
-      const fullArgs = ['--js-runtimes', 'nodejs', ...args];
+      // Inject JS runtime flag — 'node' (NOT 'nodejs')
+      const fullArgs = ['--js-runtimes', 'node', '--extractor-retries', '3', ...args];
+
+      // Add cookies file if exists (bypasses YouTube 429 rate limit)
+      const cookieFile = resolve(process.cwd(), 'data', 'youtube-cookies.txt');
+      if (existsSync(cookieFile)) {
+        fullArgs.unshift('--cookies', cookieFile);
+      }
+
       const proc = spawn(this.ytdlpPath, fullArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: false,
