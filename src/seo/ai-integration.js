@@ -470,13 +470,6 @@ export class AIIntegration {
       return null;
     }
 
-    // Try Google OAuth first, fall back to API key
-    const oauthToken = await this._getGoogleAccessToken();
-    const useOAuth = !!oauthToken;
-    if (useOAuth) {
-      logger.debug('🔑 Using Google OAuth for Gemini');
-    }
-
     // Model + API version combinations to try
     const attempts = [
       { model: options.model || 'gemini-2.0-flash', ver: 'v1beta' },
@@ -485,62 +478,90 @@ export class AIIntegration {
       { model: 'gemini-1.5-pro', ver: 'v1' },
     ];
 
-    for (const { model, ver } of attempts) {
-      try {
-        logger.debug(`🤖 Gemini: trying ${model} (${ver})${useOAuth ? ' [OAuth]' : ''}...`);
-        const url = useOAuth
-          ? `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent`
-          : `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${this._geminiKey}`;
-        const headers = { 'Content-Type': 'application/json' };
-        if (useOAuth) headers['Authorization'] = `Bearer ${oauthToken}`;
+    // Try OAuth first, then API key
+    const oauthToken = await this._getGoogleAccessToken();
+    const authMethods = [];
+    if (oauthToken) authMethods.push({ type: 'oauth', token: oauthToken });
+    if (this._geminiKey) authMethods.push({ type: 'apikey', key: this._geminiKey });
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: options.temperature || 0.7,
-              maxOutputTokens: options.maxTokens || 1024,
-            },
-          }),
-        });
+    if (authMethods.length === 0) {
+      logger.warn('Gemini: no OAuth token or API key available');
+      return null;
+    }
 
-        if (response.status === 429) {
-          logger.warn(`Gemini ${model}: quota exceeded, trying next...`);
-          await new Promise(r => setTimeout(r, 2000)); // wait before retry
-          continue;
+    for (const auth of authMethods) {
+      const label = auth.type === 'oauth' ? '[OAuth]' : '[API Key]';
+      logger.debug(`🔑 Trying Gemini with ${label}`);
+
+      for (const { model, ver } of attempts) {
+        try {
+          logger.debug(`🤖 Gemini: trying ${model} (${ver}) ${label}...`);
+          
+          let url, headers = { 'Content-Type': 'application/json' };
+          if (auth.type === 'oauth') {
+            url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent`;
+            headers['Authorization'] = `Bearer ${auth.token}`;
+          } else {
+            url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${auth.key}`;
+          }
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: options.temperature || 0.7,
+                maxOutputTokens: options.maxTokens || 1024,
+              },
+            }),
+          });
+
+          if (response.status === 429) {
+            logger.warn(`Gemini ${model}: quota exceeded, trying next...`);
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+
+          // OAuth scope failure → skip all OAuth attempts, try API key
+          if (response.status === 403 && auth.type === 'oauth') {
+            const errBody = await response.text().catch(() => '');
+            if (errBody.includes('insufficient authentication scopes') || errBody.includes('PERMISSION_DENIED')) {
+              logger.warn(`Gemini OAuth: insufficient scopes, falling back to API key...`);
+              break; // Break inner loop → try next auth method (API key)
+            }
+          }
+
+          if (!response.ok) {
+            const errBody = await response.text().catch(() => '');
+            logger.warn(`Gemini ${model} HTTP ${response.status}: ${errBody.slice(0, 150)}`);
+            continue;
+          }
+
+          const data = await response.json();
+          const candidate = data?.candidates?.[0];
+
+          if (!candidate) {
+            const errMsg = data?.error?.message || 'No candidates returned';
+            logger.warn(`Gemini ${model}: ${errMsg}`);
+            continue;
+          }
+
+          if (candidate.finishReason === 'SAFETY') {
+            logger.warn(`Gemini ${model}: blocked by safety filter`);
+            continue;
+          }
+
+          const text = candidate?.content?.parts?.[0]?.text;
+          if (text && text.trim().length > 10) {
+            logger.info(`✨ Gemini OK (${model}) ${label}: ${text.trim().slice(0, 80)}...`);
+            return text.trim();
+          }
+
+          logger.warn(`Gemini ${model}: empty/short response (finishReason=${candidate.finishReason})`);
+        } catch (err) {
+          logger.warn(`Gemini ${model} error: ${err.message}`);
         }
-
-        if (!response.ok) {
-          const errBody = await response.text().catch(() => '');
-          logger.warn(`Gemini ${model} HTTP ${response.status}: ${errBody.slice(0, 150)}`);
-          continue; // Try next model
-        }
-
-        const data = await response.json();
-        const candidate = data?.candidates?.[0];
-
-        if (!candidate) {
-          const errMsg = data?.error?.message || 'No candidates returned';
-          logger.warn(`Gemini ${model}: ${errMsg}`);
-          continue;
-        }
-
-        if (candidate.finishReason === 'SAFETY') {
-          logger.warn(`Gemini ${model}: blocked by safety filter`);
-          continue;
-        }
-
-        const text = candidate?.content?.parts?.[0]?.text;
-        if (text && text.trim().length > 10) {
-          logger.info(`✨ Gemini OK (${model}): ${text.trim().slice(0, 80)}...`);
-          return text.trim();
-        }
-
-        logger.warn(`Gemini ${model}: empty/short response (finishReason=${candidate.finishReason})`);
-      } catch (err) {
-        logger.warn(`Gemini ${model} error: ${err.message}`);
       }
     }
 
