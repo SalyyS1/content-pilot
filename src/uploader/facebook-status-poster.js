@@ -1,22 +1,42 @@
 /**
- * Facebook Status Poster — AI-Generated Motivational Quotes
+ * Facebook Status Poster — AI-Generated Quotes via HTTP (no Playwright!)
  * 
- * Uses ChatGPT/Gemini to generate fresh, unique quotes each time
- * Falls back to a small seed list if AI unavailable
+ * Posts to Facebook using mbasic.facebook.com + cookies
+ * No browser needed — pure HTTP requests
  * 
- * Features:
- * - AI-generated quotes (GPT/Gemini)
- * - Random emoji + hashtag styling
- * - Configurable interval (1-12h) with jitter
- * - Duplicate tracking (24h window)
- * - Posts via Playwright browser automation
+ * Flow:
+ * 1. GET mbasic.facebook.com → parse fb_dtsg + form action
+ * 2. AI generates quote (ChatGPT/Gemini)
+ * 3. POST form with status text
  */
 
 import logger from '../core/logger.js';
 import { getAccounts } from '../core/database.js';
-import { AIIntegration } from '../seo/ai-integration.js';
+import AIIntegration from '../seo/ai-integration.js';
 
-// Small fallback list — only used when AI is unavailable
+// AI prompt templates
+const QUOTE_PROMPTS = [
+  `Hãy viết 1 câu đạo lý / triết lý sống ngắn gọn, sâu sắc bằng tiếng Việt (1-2 câu). 
+Chủ đề ngẫu nhiên: cuộc sống, tình yêu, thành công, nỗ lực, tư duy tích cực, ước mơ.
+CHỈ trả lời câu đạo lý, không giải thích. Không dùng dấu ngoặc kép.`,
+
+  `Write a short, deep motivational quote (1-2 sentences) in Vietnamese.
+Random topic: life wisdom, self-improvement, hustle mindset, dreams.
+ONLY return the quote text, no explanation. No quotation marks.`,
+
+  `Tạo 1 câu status Facebook ý nghĩa bằng tiếng Việt. Phong cách: sâu sắc, truyền cảm hứng.
+Có thể mix tiếng Anh (kiểu Gen Z). CHỈ trả lời nội dung status.`,
+
+  `Viết 1 câu châm ngôn sống ngắn gọn, hay bằng tiếng Việt.
+Có thể về: tiền bạc, sự nghiệp, tình yêu, bản thân.
+CHỈ trả lời câu châm ngôn.`,
+
+  `Hãy viết 1 câu caption Facebook thật sâu bằng tiếng Việt.
+Giọng điệu: trưởng thành, nhẹ nhàng. 1-3 câu ngắn.
+CHỉ trả lời nội dung.`,
+];
+
+// Fallback quotes
 const FALLBACK_QUOTES = [
   'Cuộc sống không phải là chờ đợi bão tan, mà là học cách nhảy múa dưới mưa.',
   'Hãy sống như ngày mai là ngày cuối cùng, và học hỏi như thể bạn sẽ sống mãi mãi.',
@@ -30,45 +50,12 @@ const FALLBACK_QUOTES = [
   'Hãy làm việc trong im lặng, để thành công tạo nên tiếng vang.',
 ];
 
-// AI prompt templates for quote generation
-const QUOTE_PROMPTS = [
-  `Hãy viết 1 câu đạo lý / triết lý sống ngắn gọn, sâu sắc bằng tiếng Việt (1-2 câu). 
-Chủ đề ngẫu nhiên: cuộc sống, tình yêu, thành công, nỗ lực, tư duy tích cực, sức khỏe, ước mơ, tình bạn.
-CHỈ trả lời câu đạo lý, không giải thích. Không dùng dấu ngoặc kép.`,
-
-  `Write a short, deep motivational quote (1-2 sentences) in Vietnamese.
-Random topic: life wisdom, self-improvement, hustle mindset, relationships, mental health, dreams.
-ONLY return the quote text, no explanation. No quotation marks.`,
-
-  `Tạo 1 câu status Facebook ý nghĩa bằng tiếng Việt. Phong cách: sâu sắc, truyền cảm hứng, dễ share.
-Có thể mix tiếng Anh nếu hay (kiểu Gen Z). CHỈ trả lời nội dung status.`,
-
-  `Viết 1 câu châm ngôn sống ngắn gọn, hay, dễ nhớ bằng tiếng Việt.
-Có thể về: tiền bạc, sự nghiệp, tình yêu, gia đình, bản thân.
-CHỈ trả lời câu châm ngôn, không thêm gì khác.`,
-
-  `Hãy viết 1 câu caption Facebook thật sâu, kiểu "đạo lý cuộc sống" bằng tiếng Việt.
-Giọng điệu: trưởng thành, nhẹ nhàng, không sáo rỗng. 1-3 câu ngắn.
-CHỈ trả lời nội dung, không giải thích.`,
-];
-
-// Emoji categories
-const EMOJIS = {
-  positive: ['✨', '🌟', '💫', '⭐', '🌈', '🔥', '💪', '🎯', '🚀', '💯', '👊', '🏆'],
-  heart: ['❤️', '💖', '💝', '💕', '😊', '🥰', '🤗', '☺️', '💗', '💞'],
-  nature: ['🌸', '🌺', '🌻', '🍀', '🌿', '🌙', '☀️', '🌅', '🦋', '🌊'],
-  wisdom: ['📚', '🧠', '💡', '🔑', '📖', '🎓', '🏅', '🌱', '⚡', '🎭'],
-};
-
-const HASHTAGS = [
-  '#daoly', '#tuduytichcuc', '#cuocsong', '#trucham', '#quoteshay',
-  '#ngamnghi', '#suytuong', '#hanhphuc', '#thanhcong', '#donglucsong',
-  '#yeubanthan', '#tuduymoi', '#baihocsong', '#namang', '#trietly',
-  '#quotesviet', '#doisong', '#tamsu', '#motivation', '#mindset',
-];
+// Emojis & hashtags
+const EMOJIS = ['✨', '🌟', '💫', '🔥', '💪', '🎯', '🚀', '💯', '❤️', '💖', '🌸', '🌺', '🍀', '🌙', '☀️', '📚', '🧠', '💡', '🎭', '⚡'];
+const HASHTAGS = ['#daoly', '#tuduytichcuc', '#cuocsong', '#quoteshay', '#donglucsong', '#hanhphuc', '#thanhcong', '#trietly', '#motivation', '#mindset'];
 
 /**
- * Facebook Status Poster Engine — AI-Powered
+ * Facebook Status Poster — HTTP-based (no Playwright)
  */
 export class FacebookStatusPoster {
   constructor(options = {}) {
@@ -78,7 +65,6 @@ export class FacebookStatusPoster {
     this._recentQuotes = [];
     this._maxRecent = 30;
 
-    // AI integration
     this.ai = new AIIntegration();
 
     this.stats = {
@@ -93,15 +79,11 @@ export class FacebookStatusPoster {
   }
 
   start() {
-    if (this.isRunning) {
-      logger.warn('Status Poster already running');
-      return;
-    }
-
+    if (this.isRunning) return;
     this.isRunning = true;
     this.stats.startedAt = new Date().toISOString();
 
-    const aiStatus = this.ai.hasChatGPT ? 'ChatGPT ✓' : this.ai.hasGemini ? 'Gemini ✓' : '⚠️ No AI (fallback mode)';
+    const aiStatus = this.ai.hasChatGPT ? 'ChatGPT ✓' : this.ai.hasGemini ? 'Gemini ✓' : '⚠️ Fallback mode';
     logger.info(`📝 Status Poster STARTED (AI: ${aiStatus})`);
     logger.info(`  Interval: ${this._intervalMs / 3600000}h`);
 
@@ -130,232 +112,154 @@ export class FacebookStatusPoster {
    * Generate quote using AI, fallback to seed list
    */
   async _generateQuote() {
-    // Try AI first
     if (this.ai.hasChatGPT || this.ai.hasGemini) {
       try {
         const prompt = QUOTE_PROMPTS[Math.floor(Math.random() * QUOTE_PROMPTS.length)];
-
-        let quote = null;
-
-        // Try ChatGPT first, then Gemini
-        if (this.ai.hasChatGPT) {
-          quote = await this.ai.chatgpt(prompt, { temperature: 0.9 });
-        }
-        if (!quote && this.ai.hasGemini) {
-          quote = await this.ai.gemini(prompt, { temperature: 0.9, maxTokens: 200 });
-        }
+        let quote = this.ai.hasChatGPT
+          ? await this.ai.chatgpt(prompt, { temperature: 0.9 })
+          : await this.ai.gemini(prompt, { temperature: 0.9, maxTokens: 200 });
 
         if (quote) {
-          // Clean up AI response
-          quote = quote
-            .replace(/^["'"'«»]/g, '')   // Remove leading quotes
-            .replace(/["'"'«»]$/g, '')   // Remove trailing quotes
-            .replace(/^(Câu đạo lý|Quote|Status|Caption|Châm ngôn):?\s*/i, '') // Remove labels
-            .trim();
-
-          // Verify it's not too long or too short
-          if (quote.length >= 10 && quote.length <= 500) {
-            // Check not recently used
-            if (!this._recentQuotes.includes(quote)) {
-              this._recentQuotes.push(quote);
-              if (this._recentQuotes.length > this._maxRecent) this._recentQuotes.shift();
-              this.stats.aiGenerated++;
-              logger.info(`🤖 AI-generated quote: "${quote.slice(0, 60)}..."`);
-              return quote;
-            }
+          quote = quote.replace(/^["'"'«»]/g, '').replace(/["'"'«»]$/g, '').trim();
+          if (quote.length >= 10 && quote.length <= 500 && !this._recentQuotes.includes(quote)) {
+            this._recentQuotes.push(quote);
+            if (this._recentQuotes.length > this._maxRecent) this._recentQuotes.shift();
+            this.stats.aiGenerated++;
+            logger.info(`🤖 AI quote: "${quote.slice(0, 60)}..."`);
+            return quote;
           }
         }
       } catch (err) {
-        logger.warn(`AI quote generation failed: ${err.message}`);
+        logger.warn(`AI quote failed: ${err.message}`);
       }
     }
 
-    // Fallback to seed list
+    // Fallback
     const available = FALLBACK_QUOTES.filter(q => !this._recentQuotes.includes(q));
     const list = available.length > 0 ? available : FALLBACK_QUOTES;
     const quote = list[Math.floor(Math.random() * list.length)];
     this._recentQuotes.push(quote);
     if (this._recentQuotes.length > this._maxRecent) this._recentQuotes.shift();
     this.stats.fallbackUsed++;
-    logger.info(`📝 Fallback quote: "${quote.slice(0, 60)}..."`);
     return quote;
   }
 
   /**
-   * Format quote with emojis and hashtags
+   * Format quote with emojis + hashtags
    */
   _formatStatus(quote) {
-    const allEmojis = Object.values(EMOJIS).flat();
-    const emojiCount = 2 + Math.floor(Math.random() * 2);
-    const emojis = [];
-    for (let i = 0; i < emojiCount; i++) {
-      emojis.push(allEmojis[Math.floor(Math.random() * allEmojis.length)]);
-    }
-
-    const tagCount = 3 + Math.floor(Math.random() * 3);
-    const shuffled = [...HASHTAGS].sort(() => Math.random() - 0.5);
-    const tags = shuffled.slice(0, tagCount);
+    const e1 = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+    const e2 = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+    const tags = [...HASHTAGS].sort(() => Math.random() - 0.5).slice(0, 4).join(' ');
 
     const styles = [
-      () => `${emojis[0]} ${quote} ${emojis.slice(1).join('')}\n\n${tags.join(' ')}`,
-      () => `"${quote}"\n\n${emojis.join(' ')}\n\n${tags.join(' ')}`,
-      () => `${emojis[0]} ${quote}\n\n${tags.join(' ')} ${emojis[1] || ''}`,
-      () => `✍️ ${quote}\n\n${emojis.join('')} ${tags.join(' ')}`,
-      () => `💭 "${quote}"\n\n${tags.join(' ')}`,
+      `${e1} ${quote} ${e2}\n\n${tags}`,
+      `"${quote}"\n\n${e1}${e2} ${tags}`,
+      `✍️ ${quote}\n\n${tags}`,
+      `💭 "${quote}"\n\n${tags}`,
     ];
-
-    return styles[Math.floor(Math.random() * styles.length)]();
+    return styles[Math.floor(Math.random() * styles.length)];
   }
 
   /**
-   * Post status to Facebook using Playwright
+   * Post status via mbasic.facebook.com (HTTP, no browser!)
    */
-  async _postStatus(accountId, cookies, statusText) {
-    let browser = null;
+  async _postStatus(accountId, cookieString, statusText) {
     try {
-      const { chromium } = await import('playwright');
-      browser = await chromium.launch({ headless: true });
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Cookie': cookieString,
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
+      };
 
-      let cookieArr;
-      if (typeof cookies === 'string') {
-        try {
-          cookieArr = JSON.parse(cookies);
-        } catch {
-          cookieArr = cookies.split(';').map(c => {
-            const [name, ...rest] = c.trim().split('=');
-            return {
-              name: name.trim(),
-              value: rest.join('=').trim(),
-              domain: '.facebook.com',
-              path: '/',
-            };
-          }).filter(c => c.name && c.value);
+      // Step 1: GET mbasic homepage → extract fb_dtsg + compose form
+      const homeRes = await fetch('https://mbasic.facebook.com/', { headers, redirect: 'follow' });
+      const homeHtml = await homeRes.text();
+
+      // Extract fb_dtsg token
+      const dtsgMatch = homeHtml.match(/name="fb_dtsg"\s+value="([^"]+)"/);
+      if (!dtsgMatch) {
+        // Try alternate pattern
+        const dtsg2 = homeHtml.match(/fb_dtsg.*?value="([^"]+)"/s);
+        if (!dtsg2) {
+          throw new Error('Could not find fb_dtsg — cookie may be expired');
         }
-      } else if (Array.isArray(cookies)) {
-        cookieArr = cookies.map(c => ({
-          name: c.name,
-          value: c.value,
-          domain: c.domain || '.facebook.com',
-          path: c.path || '/',
-        }));
+        var fbDtsg = dtsg2[1];
+      } else {
+        var fbDtsg = dtsgMatch[1];
       }
 
-      if (!cookieArr || cookieArr.length === 0) {
-        throw new Error('No valid cookies');
+      // Extract compose form action URL
+      const formMatch = homeHtml.match(/action="(\/composer\/mbasic\/[^"]+)"/);
+      let formAction = formMatch ? formMatch[1] : null;
+
+      // Also try finding the post form
+      if (!formAction) {
+        const altForm = homeHtml.match(/action="(\/a\/home\.php[^"]*)".*?method="post"/s);
+        formAction = altForm ? altForm[1] : '/composer/mbasic/';
       }
 
-      const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        viewport: { width: 1280, height: 800 },
-        locale: 'vi-VN',
+      // Step 2: POST status
+      const formData = new URLSearchParams();
+      formData.append('fb_dtsg', fbDtsg);
+      formData.append('xhpc_context', 'home');
+      formData.append('xhpc_publish_type', 'status');
+      formData.append('xc_message', statusText);
+
+      const postRes = await fetch(`https://mbasic.facebook.com${formAction}`, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'https://mbasic.facebook.com/',
+        },
+        body: formData.toString(),
+        redirect: 'follow',
       });
 
-      await context.addCookies(cookieArr);
-      const page = await context.newPage();
-
-      await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(3000);
-
-      // Check if logged in
-      const isLoggedIn = await page.locator('[aria-label="Facebook"]').count() > 0
-                        || await page.locator('[role="banner"]').count() > 0;
-
-      if (!isLoggedIn) {
-        throw new Error('Not logged in — cookie expired?');
+      if (postRes.ok || postRes.status === 302) {
+        logger.info(`✅ Status posted via mbasic (account #${accountId})`);
+        return { success: true };
+      } else {
+        throw new Error(`HTTP ${postRes.status}`);
       }
-
-      // Click "What's on your mind?" 
-      const statusSelectors = [
-        '[aria-label="Bạn đang nghĩ gì?"]',
-        '[aria-label="What\'s on your mind"]',
-        '[aria-label*="Bạn đang nghĩ"]',
-        '[aria-label*="What\'s on your mind"]',
-        'div[role="button"][tabindex="0"] span:has-text("Bạn đang nghĩ gì")',
-        'div[role="button"][tabindex="0"] span:has-text("What\'s on your mind")',
-      ];
-
-      let clicked = false;
-      for (const sel of statusSelectors) {
-        try {
-          const el = page.locator(sel).first();
-          if (await el.count() > 0) {
-            await el.click();
-            clicked = true;
-            break;
-          }
-        } catch {}
-      }
-
-      if (!clicked) {
-        const composer = page.locator('[data-pagelet="FeedComposer"] [role="button"]').first();
-        if (await composer.count() > 0) {
-          await composer.click();
-          clicked = true;
-        }
-      }
-
-      if (!clicked) throw new Error('Could not find status input area');
-
-      await page.waitForTimeout(2000);
-
-      // Find editor
-      const editorSelectors = [
-        '[contenteditable="true"][role="textbox"]',
-        'div[contenteditable="true"][data-lexical-editor="true"]',
-        'div[contenteditable="true"]',
-      ];
-
-      let editor = null;
-      for (const sel of editorSelectors) {
-        const el = page.locator(sel).first();
-        if (await el.count() > 0) { editor = el; break; }
-      }
-
-      if (!editor) throw new Error('Could not find post editor');
-
-      await editor.click();
-      await page.waitForTimeout(500);
-      await editor.fill(statusText);
-      await page.waitForTimeout(1000);
-
-      // Click Post button
-      const postButtons = [
-        'div[aria-label="Đăng"]',
-        'div[aria-label="Post"]',
-        'button:has-text("Đăng")',
-        'button:has-text("Post")',
-      ];
-
-      let posted = false;
-      for (const sel of postButtons) {
-        try {
-          const btn = page.locator(sel).first();
-          if (await btn.count() > 0 && await btn.isEnabled()) {
-            await btn.click();
-            posted = true;
-            break;
-          }
-        } catch {}
-      }
-
-      if (!posted) throw new Error('Could not find Post button');
-
-      await page.waitForTimeout(5000);
-      await context.close();
-
-      logger.info(`✅ Status posted successfully (account #${accountId})`);
-      return { success: true };
 
     } catch (error) {
       logger.error(`❌ Status post failed: ${error.message}`);
       return { success: false, error: error.message };
-    } finally {
-      if (browser) await browser.close();
     }
   }
 
   /**
-   * Post cycle — AI generate quote → format → post to FB
+   * Extract cookie string from account credentials
+   */
+  _getCookieString(credentials) {
+    if (!credentials.cookie) return null;
+
+    // If cookie is already a string (name=val; name2=val2)
+    if (typeof credentials.cookie === 'string' && !credentials.cookie.startsWith('[')) {
+      return credentials.cookie;
+    }
+
+    // If cookie is JSON array (from browser extension)
+    try {
+      const arr = typeof credentials.cookie === 'string' 
+        ? JSON.parse(credentials.cookie) 
+        : credentials.cookie;
+      if (Array.isArray(arr)) {
+        return arr
+          .filter(c => c.name && c.value)
+          .map(c => `${c.name}=${c.value}`)
+          .join('; ');
+      }
+    } catch {}
+
+    return credentials.cookie;
+  }
+
+  /**
+   * Post cycle
    */
   async _postCycle() {
     if (!this.isRunning) return;
@@ -364,32 +268,29 @@ export class FacebookStatusPoster {
 
     try {
       const accounts = getAccounts().filter(a => a.platform === 'facebook' && a.status === 'active');
-
       if (accounts.length === 0) {
-        logger.warn('No active Facebook accounts for status posting');
+        logger.warn('No active Facebook accounts');
         this._scheduleNext();
         return;
       }
 
       const account = accounts[Math.floor(Math.random() * accounts.length)];
-
       let credentials;
-      try { credentials = JSON.parse(account.credentials || '{}'); } 
+      try { credentials = JSON.parse(account.credentials || '{}'); }
       catch { credentials = {}; }
 
-      if (!credentials.cookie) {
-        logger.warn(`Account #${account.id} has no cookies for posting`);
+      const cookieString = this._getCookieString(credentials);
+      if (!cookieString) {
+        logger.warn(`Account #${account.id} has no cookies`);
         this._scheduleNext();
         return;
       }
 
-      // AI-generate quote
       const quote = await this._generateQuote();
       const statusText = this._formatStatus(quote);
 
       logger.info(`📝 Posting: "${quote.slice(0, 60)}..." → account #${account.id}`);
-
-      const result = await this._postStatus(account.id, credentials.cookie, statusText);
+      const result = await this._postStatus(account.id, cookieString, statusText);
 
       if (result.success) {
         this.stats.totalPosted++;
@@ -398,9 +299,8 @@ export class FacebookStatusPoster {
       } else {
         this.stats.totalFailed++;
       }
-
     } catch (error) {
-      logger.error(`Status poster cycle failed: ${error.message}`);
+      logger.error(`Status poster failed: ${error.message}`);
       this.stats.totalFailed++;
     }
 
@@ -409,10 +309,9 @@ export class FacebookStatusPoster {
 
   _scheduleNext() {
     if (!this.isRunning) return;
-    const jitter = (Math.random() - 0.5) * 60 * 60 * 1000; // ±30min
+    const jitter = (Math.random() - 0.5) * 60 * 60 * 1000;
     const nextMs = this._intervalMs + jitter;
-    const nextHours = (nextMs / 3600000).toFixed(1);
-    logger.info(`📝 Next status in ~${nextHours}h`);
+    logger.info(`📝 Next status in ~${(nextMs / 3600000).toFixed(1)}h`);
     this._timer = setTimeout(() => this._postCycle(), nextMs);
   }
 }
