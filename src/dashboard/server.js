@@ -566,13 +566,49 @@ export function startDashboard(options = {}) {
     }
   });
 
-  app.post('/api/ai-auth/gemini', (req, res) => {
+  app.post('/api/ai-auth/gemini', async (req, res) => {
     try {
       const { apiKey } = req.body;
       if (!apiKey || apiKey.length < 10) {
         return res.status(400).json({ error: 'API key không hợp lệ' });
       }
 
+      // Validate key by making a real API call
+      const testModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro'];
+      let validated = false;
+      let validModel = '';
+
+      for (const model of testModels) {
+        try {
+          const testRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Say "OK" in one word.' }] }],
+                generationConfig: { maxOutputTokens: 10 },
+              }),
+            }
+          );
+
+          if (testRes.ok) {
+            const testData = await testRes.json();
+            const text = testData?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              validated = true;
+              validModel = model;
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      if (!validated) {
+        return res.status(400).json({ error: '❌ API key không hoạt động. Kiểm tra lại key tại aistudio.google.com/apikey' });
+      }
+
+      // Key works — save it
       const sessionsDir = resolve(process.cwd(), 'data', 'sessions');
       if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true });
 
@@ -586,8 +622,12 @@ export function startDashboard(options = {}) {
       data.savedAt = new Date().toISOString();
       writeFileSync(tokensFile, JSON.stringify(data, null, 2));
 
-      logger.info('🔑 Gemini API key saved from dashboard');
-      res.json({ message: '✅ Gemini API key đã lưu! Restart Story Writer để áp dụng.', geminiKeyPreview: apiKey.slice(0, 8) + '...' + apiKey.slice(-4) });
+      logger.info(`🔑 Gemini API key saved + validated (model: ${validModel})`);
+      res.json({ 
+        message: `✅ Gemini API key hoạt động! (${validModel})`, 
+        geminiKeyPreview: apiKey.slice(0, 8) + '...' + apiKey.slice(-4),
+        validModel,
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
