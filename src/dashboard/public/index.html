@@ -1,116 +1,417 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReupVideo Dashboard</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="dashboard">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-left">
-        <h1>📊 ReupVideo</h1>
-        <span class="badge" id="status-badge">Loading...</span>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReupVideo Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-icon">🎬</span>
+        <span class="brand-text">ReupVideo</span>
       </div>
-      <div class="header-right">
-        <span id="clock"></span>
+      <div class="nav-items">
+        <a
+          class="nav-item active"
+          data-page="dashboard"
+          onclick="switchPage('dashboard')"
+        >
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a
+          class="nav-item"
+          data-page="accounts"
+          onclick="switchPage('accounts')"
+        >
+          <span class="nav-icon">👥</span> Accounts
+        </a>
+        <a
+          class="nav-item"
+          data-page="settings"
+          onclick="switchPage('settings')"
+        >
+          <span class="nav-icon">⚙️</span> Settings
+        </a>
+        <a class="nav-item" data-page="logs" onclick="switchPage('logs')">
+          <span class="nav-icon">📝</span> Logs
+        </a>
       </div>
-    </header>
+      <div class="sidebar-footer">
+        <div class="ai-status">
+          <div id="ai-chatgpt" class="ai-badge">
+            🤖 ChatGPT <span class="dot red"></span>
+          </div>
+          <div id="ai-gemini" class="ai-badge">
+            ✨ Gemini <span class="dot red"></span>
+          </div>
+        </div>
+        <div class="sidebar-clock" id="clock">--:--:--</div>
+      </div>
+    </nav>
 
-    <!-- Overview Cards -->
-    <section class="cards" id="overview-cards">
-      <div class="card">
-        <div class="card-icon">📹</div>
-        <div class="card-info">
-          <span class="card-value" id="today-uploads">-</span>
-          <span class="card-label">Today</span>
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- ============ DASHBOARD PAGE ============ -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <h1>📊 Dashboard</h1>
+          <span class="badge" id="status-badge">Loading...</span>
+        </div>
+
+        <!-- Overview Cards -->
+        <section class="cards" id="overview-cards">
+          <div class="card">
+            <div class="card-icon">📹</div>
+            <div class="card-info">
+              <span class="card-value" id="today-uploads">-</span>
+              <span class="card-label">Hôm nay</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">📅</div>
+            <div class="card-info">
+              <span class="card-value" id="week-uploads">-</span>
+              <span class="card-label">Tuần này</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">👥</div>
+            <div class="card-info">
+              <span class="card-value" id="active-accounts">-</span>
+              <span class="card-label">Accounts</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">💰</div>
+            <div class="card-info">
+              <span class="card-value" id="revenue-est">-</span>
+              <span class="card-label">Est. Revenue</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Account Health -->
+        <section class="panel">
+          <h2>🏥 Account Health</h2>
+          <div class="health-grid" id="health-grid">
+            <p class="muted">Loading...</p>
+          </div>
+        </section>
+
+        <!-- Calendar -->
+        <section class="panel">
+          <h2>📅 Upload Calendar</h2>
+          <div class="calendar-nav">
+            <button id="cal-prev">◀</button>
+            <span id="cal-month">Loading...</span>
+            <button id="cal-next">▶</button>
+          </div>
+          <div class="calendar-grid" id="calendar-grid"></div>
+          <div class="calendar-legend">
+            <span
+              ><span class="cal-dot" style="background: #1a1a2e"></span>0</span
+            >
+            <span
+              ><span class="cal-dot" style="background: #16213e"></span
+              >1-2</span
+            >
+            <span
+              ><span class="cal-dot" style="background: #0f3460"></span
+              >3-5</span
+            >
+            <span
+              ><span class="cal-dot" style="background: #533483"></span
+              >6-9</span
+            >
+            <span
+              ><span class="cal-dot" style="background: #e94560"></span
+              >10+</span
+            >
+          </div>
+        </section>
+
+        <!-- Recent Uploads -->
+        <section class="panel">
+          <h2>📋 Recent Uploads</h2>
+          <div class="table-wrap">
+            <table id="uploads-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Platform</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="uploads-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Queue -->
+        <section class="panel">
+          <h2>⏳ Queue</h2>
+          <div id="queue-list" class="queue-list">
+            <p class="muted">No jobs in queue</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ ACCOUNTS PAGE ============ -->
+      <div class="page" id="page-accounts">
+        <div class="page-header">
+          <h1>👥 Accounts</h1>
+          <button class="btn-primary" onclick="showAddAccountModal()">
+            + Thêm Account
+          </button>
+        </div>
+
+        <!-- Account Cards -->
+        <div class="accounts-grid" id="accounts-grid">
+          <p class="muted">Loading accounts...</p>
+        </div>
+
+        <!-- Add Account Modal -->
+        <div class="modal-overlay" id="add-account-modal" style="display: none">
+          <div class="modal">
+            <div class="modal-header">
+              <h3>Thêm Account</h3>
+              <button class="modal-close" onclick="hideAddAccountModal()">
+                ✕
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label>Platform</label>
+                <select id="acc-platform">
+                  <option value="youtube">YouTube</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="tiktok">TikTok</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Tên hiển thị</label>
+                <input type="text" id="acc-name" placeholder="My Channel" />
+              </div>
+              <div class="form-group">
+                <label>Email / Username</label>
+                <input
+                  type="text"
+                  id="acc-email"
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div class="form-group">
+                <label>Cookie / Token (optional)</label>
+                <textarea
+                  id="acc-cookie"
+                  rows="3"
+                  placeholder="Paste cookie or auth token..."
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label>Pages (Facebook only, comma separated)</label>
+                <input
+                  type="text"
+                  id="acc-pages"
+                  placeholder="Page Name 1, Page Name 2"
+                />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-secondary" onclick="hideAddAccountModal()">
+                Hủy
+              </button>
+              <button class="btn-primary" onclick="addAccount()">Thêm</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-icon">📅</div>
-        <div class="card-info">
-          <span class="card-value" id="week-uploads">-</span>
-          <span class="card-label">This Week</span>
+
+      <!-- ============ SETTINGS PAGE ============ -->
+      <div class="page" id="page-settings">
+        <div class="page-header">
+          <h1>⚙️ Settings</h1>
+          <button class="btn-primary" onclick="saveSettings()">💾 Lưu</button>
         </div>
+
+        <!-- Autopilot Settings -->
+        <section class="panel settings-section">
+          <h2>🚀 Autopilot</h2>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label>Interval (phút)</label>
+              <input
+                type="number"
+                id="set-interval"
+                value="10"
+                min="5"
+                max="120"
+              />
+            </div>
+            <div class="form-group">
+              <label>Max uploads/ngày</label>
+              <input
+                type="number"
+                id="set-max-uploads"
+                value="20"
+                min="1"
+                max="100"
+              />
+            </div>
+            <div class="form-group">
+              <label>Transform Mode</label>
+              <select id="set-transform">
+                <option value="auto">Auto (AI chọn)</option>
+                <option value="strong">Strong (nhiều thay đổi)</option>
+                <option value="light">Light (ít thay đổi)</option>
+                <option value="none">None (giữ nguyên)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Processing Preset</label>
+              <select id="set-preset">
+                <option value="standard">Standard</option>
+                <option value="fast">Fast</option>
+                <option value="quality">Quality</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Target Platforms -->
+        <section class="panel settings-section">
+          <h2>🎯 Platforms & Niches</h2>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label>Platforms</label>
+              <div class="checkbox-group">
+                <label
+                  ><input type="checkbox" id="set-yt" checked /> YouTube</label
+                >
+                <label
+                  ><input type="checkbox" id="set-fb" checked /> Facebook</label
+                >
+                <label><input type="checkbox" id="set-tt" /> TikTok</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Categories</label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" checked /> Entertainment</label>
+                <label><input type="checkbox" checked /> Music</label>
+                <label><input type="checkbox" checked /> Gaming</label>
+                <label><input type="checkbox" checked /> Comedy</label>
+                <label><input type="checkbox" /> Pets & Animals</label>
+                <label><input type="checkbox" /> Food</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SEO Settings -->
+        <section class="panel settings-section">
+          <h2>🔍 SEO & AI</h2>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label>Language</label>
+              <select id="set-lang">
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+                <option value="auto">Auto detect</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>AI Model</label>
+              <select id="set-model">
+                <option value="auto">Auto (ChatGPT → Gemini fallback)</option>
+                <option value="chatgpt">ChatGPT only</option>
+                <option value="gemini">Gemini only</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>SEO Title Generation</label>
+              <select id="set-seo-title">
+                <option value="ai">AI Generated</option>
+                <option value="original">Keep Original</option>
+                <option value="translate">Translate to Target</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Hashtag Count</label>
+              <input
+                type="number"
+                id="set-hashtags"
+                value="20"
+                min="5"
+                max="30"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Anti-Ban -->
+        <section class="panel settings-section">
+          <h2>🛡️ Anti-Ban</h2>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label>Upload Strategy</label>
+              <select id="set-strategy">
+                <option value="conservative">
+                  Conservative (chậm, an toàn)
+                </option>
+                <option value="balanced">Balanced</option>
+                <option value="aggressive">Aggressive (nhanh, rủi ro)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Account Rotation</label>
+              <select id="set-rotation">
+                <option value="round-robin">Round Robin</option>
+                <option value="random">Random</option>
+                <option value="health-based">Health Based</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Rest Period (phút giữa mỗi upload)</label>
+              <input type="number" id="set-rest" value="5" min="1" />
+            </div>
+            <div class="form-group">
+              <label>Warm-up Days (ngày mới)</label>
+              <input type="number" id="set-warmup" value="7" min="1" />
+            </div>
+          </div>
+        </section>
       </div>
-      <div class="card">
-        <div class="card-icon">👥</div>
-        <div class="card-info">
-          <span class="card-value" id="active-accounts">-</span>
-          <span class="card-label">Accounts</span>
+
+      <!-- ============ LOGS PAGE ============ -->
+      <div class="page" id="page-logs">
+        <div class="page-header">
+          <h1>📝 Live Logs</h1>
+          <div>
+            <select id="log-filter" onchange="loadLogs()">
+              <option value="all">All</option>
+              <option value="info">Info</option>
+              <option value="error">Errors</option>
+              <option value="warn">Warnings</option>
+            </select>
+            <button class="btn-secondary" onclick="clearLogs()">Clear</button>
+          </div>
         </div>
+        <section class="panel log-panel">
+          <div class="log-container" id="log-container"></div>
+        </section>
       </div>
-      <div class="card">
-        <div class="card-icon">💰</div>
-        <div class="card-info">
-          <span class="card-value" id="revenue-est">-</span>
-          <span class="card-label">Est. Revenue</span>
-        </div>
-      </div>
-    </section>
+    </main>
 
-    <!-- Account Health Gauges -->
-    <section class="panel">
-      <h2>🏥 Account Health</h2>
-      <div class="health-grid" id="health-grid">
-        <p class="muted">Loading health data...</p>
-      </div>
-    </section>
-
-    <!-- Upload Calendar Heatmap -->
-    <section class="panel">
-      <h2>📅 Upload Calendar</h2>
-      <div class="calendar-nav">
-        <button id="cal-prev">◀</button>
-        <span id="cal-month">Loading...</span>
-        <button id="cal-next">▶</button>
-      </div>
-      <div class="calendar-grid" id="calendar-grid"></div>
-      <div class="calendar-legend">
-        <span><span class="cal-dot" style="background:#1a1a2e"></span>0</span>
-        <span><span class="cal-dot" style="background:#16213e"></span>1-2</span>
-        <span><span class="cal-dot" style="background:#0f3460"></span>3-5</span>
-        <span><span class="cal-dot" style="background:#533483"></span>6-9</span>
-        <span><span class="cal-dot" style="background:#e94560"></span>10+</span>
-      </div>
-    </section>
-
-    <!-- Recent Uploads -->
-    <section class="panel">
-      <h2>📋 Recent Uploads</h2>
-      <div class="table-wrap">
-        <table id="uploads-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Platform</th>
-              <th>Account</th>
-              <th>Status</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="uploads-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Queue -->
-    <section class="panel">
-      <h2>⏳ Queue</h2>
-      <div id="queue-list" class="queue-list">
-        <p class="muted">No jobs in queue</p>
-      </div>
-    </section>
-
-    <!-- Logs -->
-    <section class="panel">
-      <h2>📝 Live Logs</h2>
-      <div class="log-container" id="log-container"></div>
-    </section>
-  </div>
-
-  <script src="app.js"></script>
-</body>
+    <script src="app.js"></script>
+  </body>
 </html>
