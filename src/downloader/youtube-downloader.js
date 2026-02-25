@@ -1,20 +1,44 @@
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync } from 'fs';
-import { resolve, basename } from 'path';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
+import { resolve, basename, join } from 'path';
 import config from '../core/config.js';
 import logger from '../core/logger.js';
 import { addVideo, getVideoByUrl, updateVideo } from '../core/database.js';
 import { getNicheConfig, getCycleQueries, getFormatType } from '../core/niche-config.js';
 
 /**
- * YouTube Downloader - wraps yt-dlp CLI
- * Downloads YouTube Shorts with metadata extraction
+ * YouTube/Facebook Downloader - wraps yt-dlp CLI
+ * Downloads videos with proxy rotation + metadata extraction
  */
 export class YouTubeDownloader {
   constructor(options = {}) {
     this.outputDir = options.outputDir || config.downloadDir;
     this.ytdlpPath = options.ytdlpPath || 'yt-dlp';
     if (!existsSync(this.outputDir)) mkdirSync(this.outputDir, { recursive: true });
+
+    // Load proxy list
+    this._proxies = [];
+    this._loadProxies();
+  }
+
+  _loadProxies() {
+    const proxyFile = resolve(process.cwd(), 'data', 'socks5.txt');
+    if (existsSync(proxyFile)) {
+      try {
+        const lines = readFileSync(proxyFile, 'utf8').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        this._proxies = lines;
+        logger.info(`🌐 Loaded ${this._proxies.length} proxies from socks5.txt`);
+      } catch (err) {
+        logger.warn(`Failed to load proxies: ${err.message}`);
+      }
+    } else {
+      logger.debug('No proxy file found at data/socks5.txt');
+    }
+  }
+
+  _getRandomProxy() {
+    if (this._proxies.length === 0) return null;
+    return this._proxies[Math.floor(Math.random() * this._proxies.length)];
   }
 
   /**
@@ -398,6 +422,13 @@ export class YouTubeDownloader {
       const cookieFile = resolve(process.cwd(), 'data', 'youtube-cookies.txt');
       if (existsSync(cookieFile)) {
         fullArgs.unshift('--cookies', cookieFile);
+      }
+
+      // Add random proxy from pool (SOCKS5)
+      const proxy = this._getRandomProxy();
+      if (proxy) {
+        fullArgs.unshift('--proxy', `socks5://${proxy}`);
+        if (!captureOutput) logger.debug(`🌐 Using proxy: ${proxy}`);
       }
 
       const proc = spawn(this.ytdlpPath, fullArgs, {

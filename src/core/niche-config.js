@@ -85,6 +85,7 @@ const NICHE_PROFILES = {
     language: 'vi',
     region: 'VN',
     searchQueries: [
+      // YouTube sources (yt-dlp search)
       'ẩm thực đường phố việt nam',
       'street food vietnam shorts',
       'nấu ăn ngon shorts',
@@ -93,9 +94,22 @@ const NICHE_PROFILES = {
       'ẩm thực sài gòn shorts',
       'mukbang vietnam shorts',
       'review đồ ăn shorts',
-      // 30% viral mix
+      // Viral mix
       'funny moments viral shorts',
       'satisfying food shorts',
+    ],
+    // Facebook Reels pages — yt-dlp can download from these directly
+    facebookSources: [
+      'https://www.facebook.com/reel/',
+      'https://www.facebook.com/watch/',
+    ],
+    // Facebook Reels search keywords (for scraping)
+    facebookSearchQueries: [
+      'ẩm thực đường phố',
+      'street food vietnam',
+      'nấu ăn ngon',
+      'đồ ăn vặt viral',
+      'mukbang vietnam',
     ],
     queriesPerCycle: 3,
     filters: {
@@ -106,7 +120,6 @@ const NICHE_PROFILES = {
     // Audio mixing: overlay background music on food clips
     audioMix: true,
     audioMixSources: [
-      // Royalty-free background audio styles
       'upbeat cooking music',
       'cheerful background music no copyright',
       'vietnamese background music',
