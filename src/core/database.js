@@ -23,7 +23,7 @@ function initSchema() {
     -- Accounts (YouTube / Facebook)
     CREATE TABLE IF NOT EXISTS accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      platform TEXT NOT NULL CHECK(platform IN ('youtube', 'facebook')),
+      platform TEXT NOT NULL CHECK(platform IN ('youtube', 'facebook', 'tiktok')),
       name TEXT NOT NULL,
       auth_type TEXT NOT NULL CHECK(auth_type IN ('api', 'cookie', 'browser')),
       credentials TEXT, -- JSON: tokens, cookies, etc (encrypted in production)
@@ -115,6 +115,24 @@ export function getAccounts(platform = null) {
     return getDb().prepare('SELECT * FROM accounts WHERE platform = ? AND status = ?').all(platform, 'active');
   }
   return getDb().prepare('SELECT * FROM accounts WHERE status = ?').all('active');
+}
+
+export function getAccount(id) {
+  return getDb().prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+}
+
+export function deleteAccount(id) {
+  getDb().prepare("UPDATE accounts SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+}
+
+export function getAllAccountsWithStats() {
+  return getDb().prepare(`
+    SELECT a.*,
+      (SELECT COUNT(*) FROM uploads WHERE account_id = a.id) as total_uploads,
+      (SELECT COUNT(*) FROM uploads WHERE account_id = a.id AND uploaded_at >= date('now')) as today_uploads
+    FROM accounts WHERE a.status != 'inactive'
+    ORDER BY a.created_at DESC
+  `).all();
 }
 
 export function updateAccountCredentials(id, credentials) {
@@ -253,7 +271,8 @@ export function bulkSetSettings(settingsObj) {
 }
 
 export default {
-  getDb, addAccount, getAccounts, updateAccountCredentials,
+  getDb, addAccount, getAccount, getAccounts, getAllAccountsWithStats,
+  deleteAccount, updateAccountCredentials,
   addVideo, getVideo, getVideoByUrl, updateVideo,
   addUpload, getUploads, updateUpload,
   addJob, getNextJob, updateJob,

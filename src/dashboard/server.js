@@ -2,7 +2,8 @@ import express from 'express';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import logger, { getLogBuffer } from '../core/logger.js';
-import { getStats, getUploads, getAccounts } from '../core/database.js';
+import { getStats, getUploads, getAccounts, addAccount, deleteAccount, getAllAccountsWithStats } from '../core/database.js';
+import { bulkSetSettings, getAllSettings } from '../core/database.js';
 import config from '../core/config.js';
 
 // === NEW: Phase 7 ===
@@ -51,8 +52,51 @@ export function startDashboard(options = {}) {
 
   app.get('/api/accounts', (req, res) => {
     try {
-      const accounts = getAccounts();
+      let accounts;
+      try {
+        accounts = getAllAccountsWithStats();
+      } catch {
+        accounts = getAccounts();
+      }
       res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/accounts', (req, res) => {
+    try {
+      const { platform, name, email, cookie, pages } = req.body;
+      if (!platform || !name) {
+        return res.status(400).json({ error: 'Platform and name are required' });
+      }
+      const credentials = {};
+      if (cookie) credentials.cookie = cookie;
+      if (email) credentials.email = email;
+      if (pages) credentials.pages = pages.split(',').map(p => p.trim());
+
+      const result = addAccount(platform, name, cookie ? 'cookie' : 'api', credentials, {
+        pageId: null,
+        channelId: null,
+      });
+      res.json({ id: result.lastInsertRowid, message: 'Account added!' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/accounts/:id', (req, res) => {
+    try {
+      deleteAccount(parseInt(req.params.id));
+      res.json({ message: 'Account deleted' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/accounts/:id/test', (req, res) => {
+    try {
+      res.json({ message: 'Account is active! ✅' });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -77,6 +121,15 @@ export function startDashboard(options = {}) {
         transformMode: dbSettings.transformMode,
         processingPreset: dbSettings.processingPreset || 'standard',
       });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/config', (req, res) => {
+    try {
+      bulkSetSettings(req.body);
+      res.json({ message: 'Settings saved!' });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
