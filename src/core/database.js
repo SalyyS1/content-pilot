@@ -130,7 +130,7 @@ export function getAllAccountsWithStats() {
     SELECT a.*,
       (SELECT COUNT(*) FROM uploads WHERE account_id = a.id) as total_uploads,
       (SELECT COUNT(*) FROM uploads WHERE account_id = a.id AND uploaded_at >= date('now')) as today_uploads
-    FROM accounts WHERE a.status != 'inactive'
+    FROM accounts a WHERE a.status != 'inactive'
     ORDER BY a.created_at DESC
   `).all();
 }
