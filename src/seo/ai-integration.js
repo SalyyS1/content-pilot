@@ -377,15 +377,35 @@ export class AIIntegration {
         }
       );
 
-      if (response.status === 401 || response.status === 403) {
-        logger.warn('Gemini API key invalid. Run: reup auth gemini');
+      if (!response.ok) {
+        const errBody = await response.text();
+        logger.warn(`Gemini HTTP ${response.status}: ${errBody.slice(0, 200)}`);
         return null;
       }
 
       const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) logger.debug(`✨ Gemini: ${text.slice(0, 80)}...`);
-      return text?.trim() || null;
+
+      // Check for safety filter blocks
+      const candidate = data?.candidates?.[0];
+      if (candidate?.finishReason === 'SAFETY') {
+        logger.warn('Gemini: blocked by safety filter');
+        return null;
+      }
+      if (!candidate) {
+        // API error in body (quota, model not found, etc.)
+        const errMsg = data?.error?.message || JSON.stringify(data).slice(0, 200);
+        logger.warn(`Gemini API error: ${errMsg}`);
+        return null;
+      }
+
+      const text = candidate?.content?.parts?.[0]?.text;
+      if (text) {
+        logger.debug(`✨ Gemini OK: ${text.slice(0, 80)}...`);
+        return text.trim();
+      }
+
+      logger.warn(`Gemini: empty response. finishReason=${candidate.finishReason}`);
+      return null;
     } catch (err) {
       logger.warn(`Gemini API failed: ${err.message}`);
       return null;
