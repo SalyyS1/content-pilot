@@ -353,7 +353,7 @@ export class AIIntegration {
 
   /**
    * Call Gemini API — multi-model fallback chain
-   * Tries: gemini-2.0-flash → gemini-1.5-flash → gemini-pro
+   * Tries multiple models with both v1beta and v1 endpoints
    */
   async gemini(prompt, options = {}) {
     if (!this.hasGemini) {
@@ -361,17 +361,19 @@ export class AIIntegration {
       return null;
     }
 
-    const models = [
-      options.model || 'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-pro',
+    // Model + API version combinations to try
+    const attempts = [
+      { model: options.model || 'gemini-2.0-flash', ver: 'v1beta' },
+      { model: 'gemini-2.0-flash-lite', ver: 'v1beta' },
+      { model: 'gemini-1.5-flash', ver: 'v1' },
+      { model: 'gemini-1.5-pro', ver: 'v1' },
     ];
 
-    for (const model of models) {
+    for (const { model, ver } of attempts) {
       try {
-        logger.debug(`🤖 Gemini: trying model ${model}...`);
+        logger.debug(`🤖 Gemini: trying ${model} (${ver})...`);
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this._geminiKey}`,
+          `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${this._geminiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -384,6 +386,12 @@ export class AIIntegration {
             }),
           }
         );
+
+        if (response.status === 429) {
+          logger.warn(`Gemini ${model}: quota exceeded, trying next...`);
+          await new Promise(r => setTimeout(r, 2000)); // wait before retry
+          continue;
+        }
 
         if (!response.ok) {
           const errBody = await response.text().catch(() => '');
