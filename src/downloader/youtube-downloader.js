@@ -94,7 +94,7 @@ export class YouTubeDownloader {
 
     try {
       const outputTemplate = pathResolve(this.outputDir, '%(id)s.%(ext)s');
-      const filePath = await this._runYtdlp([
+      const filePath = await this.runWithProxyRetry([
         url,
         '-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
         '--merge-output-format', 'mp4',
@@ -318,7 +318,7 @@ export class YouTubeDownloader {
         '--geo-bypass-country', region,
       ];
 
-      const output = await this._runYtdlp(args, true);
+      const output = await this.runWithProxyRetry(args, true);
       const lines = output.trim().split('\n').filter(l => l.trim());
 
       return lines.map(line => {
@@ -477,6 +477,10 @@ export class YouTubeDownloader {
         if (code === 0) {
           resolve(captureOutput ? stdout : '');
         } else {
+          // Mark proxy as dead if timeout
+          if (proxy && (stderr.includes('timed out') || stderr.includes('Connection refused') || stderr.includes('SOCKS'))) {
+            this._markProxyDead(proxy);
+          }
           reject(new Error(`yt-dlp exited with code ${code}: ${stderr.slice(0, 500)}`));
         }
       });
@@ -486,6 +490,41 @@ export class YouTubeDownloader {
       });
     });
   }
+
+  /**
+   * Run yt-dlp with proxy retry — tries up to maxRetries different proxies on timeout
+   */
+  async runWithProxyRetry(args, captureOutput = false, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this._runYtdlp(args, captureOutput);
+      } catch (err) {
+        const isProxyError = err.message.includes('timed out') || 
+          err.message.includes('Connection refused') || 
+          err.message.includes('SOCKS') ||
+          err.message.includes('proxy');
+        
+        if (isProxyError && attempt < maxRetries && this._proxies.length > 0) {
+          logger.warn(`🔄 Proxy failed (attempt ${attempt}/${maxRetries}), trying another proxy...`);
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  /**
+   * Mark a proxy as dead — remove from pool for this session
+   */
+  _markProxyDead(proxy) {
+    const raw = proxy.replace(/^(socks5|http):\/\//, '');
+    const idx = this._proxies.indexOf(raw);
+    if (idx !== -1) {
+      this._proxies.splice(idx, 1);
+      logger.debug(`🚫 Removed dead proxy: ${raw} (${this._proxies.length} remaining)`);
+    }
+  }
 }
 
 export default YouTubeDownloader;
+
