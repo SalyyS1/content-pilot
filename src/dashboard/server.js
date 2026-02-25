@@ -1,7 +1,7 @@
 import express from 'express';
 import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import logger, { getLogBuffer } from '../core/logger.js';
 import { getStats, getUploads, getAccounts, getAccount, addAccount, deleteAccount, getAllAccountsWithStats, updateAccountCredentials } from '../core/database.js';
 import { bulkSetSettings, getAllSettings } from '../core/database.js';
