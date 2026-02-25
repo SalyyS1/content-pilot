@@ -309,6 +309,10 @@ export class AIIntegration {
       });
 
       if (response.status === 401 || response.status === 403) {
+        if (options._retried) {
+          logger.warn('ChatGPT: still 401/403 after refresh. Session may be invalid. Run: reup auth chatgpt');
+          return null;
+        }
         // Token expired, try refresh once
         logger.info('🔄 Token bị reject, thử refresh...');
         this._accessToken = null;
@@ -318,7 +322,7 @@ export class AIIntegration {
           logger.warn('ChatGPT session expired. Run: reup auth chatgpt');
           return null;
         }
-        // Retry with new token
+        // Retry with new token (once only)
         return this.chatgpt(prompt, { ...options, _retried: true });
       }
 
