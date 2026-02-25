@@ -470,6 +470,7 @@ export class AIIntegration {
    */
   async gemini(prompt, options = {}) {
     const CLIPROXY_URL = process.env.CLIPROXY_URL || 'http://localhost:8317';
+    const CLIPROXY_KEY = process.env.CLIPROXY_KEY || 'salyyy';
     const model = options.model || 'gemini-2.0-flash';
 
     // 1) Try CLIProxyAPI (OpenAI-compatible, handles OAuth internally)
@@ -477,7 +478,10 @@ export class AIIntegration {
       logger.debug(`🤖 Gemini via CLIProxyAPI: ${model}...`);
       const response = await fetch(`${CLIPROXY_URL}/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CLIPROXY_KEY}`,
+        },
         body: JSON.stringify({
           model,
           messages: [{ role: 'user', content: prompt }],
