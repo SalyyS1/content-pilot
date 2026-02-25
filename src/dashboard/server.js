@@ -542,6 +542,89 @@ export function startDashboard(options = {}) {
     }
   });
 
+  // === AI AUTH endpoints ===
+
+  app.get('/api/ai-status', (req, res) => {
+    try {
+      const tokensFile = resolve(process.cwd(), 'data', 'sessions', 'ai-tokens.json');
+      let chatgpt = false, gemini = false, geminiKeyPreview = '';
+      
+      if (existsSync(tokensFile)) {
+        const data = JSON.parse(readFileSync(tokensFile, 'utf8'));
+        if (data.chatgpt?.sessionToken) {
+          chatgpt = data.chatgpt.sessionExpiry > Date.now();
+        }
+        if (data.geminiKey) {
+          gemini = true;
+          geminiKeyPreview = data.geminiKey.slice(0, 8) + '...' + data.geminiKey.slice(-4);
+        }
+      }
+      
+      res.json({ chatgpt, gemini, geminiKeyPreview });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/ai-auth/gemini', (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      if (!apiKey || apiKey.length < 10) {
+        return res.status(400).json({ error: 'API key không hợp lệ' });
+      }
+
+      const sessionsDir = resolve(process.cwd(), 'data', 'sessions');
+      if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true });
+
+      const tokensFile = resolve(sessionsDir, 'ai-tokens.json');
+      let data = {};
+      if (existsSync(tokensFile)) {
+        try { data = JSON.parse(readFileSync(tokensFile, 'utf8')); } catch {}
+      }
+
+      data.geminiKey = apiKey.trim();
+      data.savedAt = new Date().toISOString();
+      writeFileSync(tokensFile, JSON.stringify(data, null, 2));
+
+      logger.info('🔑 Gemini API key saved from dashboard');
+      res.json({ message: '✅ Gemini API key đã lưu! Restart Story Writer để áp dụng.', geminiKeyPreview: apiKey.slice(0, 8) + '...' + apiKey.slice(-4) });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/ai-auth/chatgpt', (req, res) => {
+    try {
+      const { sessionToken } = req.body;
+      if (!sessionToken || sessionToken.length < 10) {
+        return res.status(400).json({ error: 'Session token không hợp lệ' });
+      }
+
+      const sessionsDir = resolve(process.cwd(), 'data', 'sessions');
+      if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true });
+
+      const tokensFile = resolve(sessionsDir, 'ai-tokens.json');
+      let data = {};
+      if (existsSync(tokensFile)) {
+        try { data = JSON.parse(readFileSync(tokensFile, 'utf8')); } catch {}
+      }
+
+      data.chatgpt = {
+        sessionToken: sessionToken.trim(),
+        sessionExpiry: Date.now() + 90 * 24 * 3600 * 1000, // 90 days
+        accessToken: null,
+        accessTokenExpiry: 0,
+      };
+      data.savedAt = new Date().toISOString();
+      writeFileSync(tokensFile, JSON.stringify(data, null, 2));
+
+      logger.info('🔑 ChatGPT session token saved from dashboard');
+      res.json({ message: '✅ ChatGPT token đã lưu! Restart Story Writer để áp dụng.' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // SPA fallback
   app.get('*', (req, res) => {
     res.sendFile(resolve(__dirname, 'public', 'index.html'));

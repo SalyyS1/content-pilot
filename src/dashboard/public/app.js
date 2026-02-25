@@ -697,18 +697,78 @@ async function saveSettings() {
 
 
 // =============================================
-//  AI STATUS
+//  AI STATUS & AUTH
 // =============================================
 async function checkAIStatus() {
   try {
-    const chatgpt = document.querySelector('#ai-chatgpt .dot');
-    const gemini = document.querySelector('#ai-gemini .dot');
+    const data = await api('/api/ai-status');
+    
+    // Update sidebar dots
+    const chatgptDot = document.querySelector('#ai-chatgpt .dot');
+    const geminiDot = document.querySelector('#ai-gemini .dot');
+    if (chatgptDot) chatgptDot.className = data.chatgpt ? 'dot green' : 'dot red';
+    if (geminiDot) geminiDot.className = data.gemini ? 'dot green' : 'dot red';
 
-    await api('/api/stats').catch(() => null);
-
-    if (chatgpt) chatgpt.className = 'dot green';
-    if (gemini) gemini.className = 'dot green';
+    // Update settings page badges
+    const geminiBadge = document.getElementById('ai-gemini-badge');
+    const chatgptBadge = document.getElementById('ai-chatgpt-badge');
+    if (geminiBadge) {
+      geminiBadge.textContent = data.gemini ? `✅ Gemini: ${data.geminiKeyPreview}` : '❌ Gemini: chưa cấu hình';
+      geminiBadge.style.background = data.gemini ? '#1a3a1a' : '#3a1a1a';
+      geminiBadge.style.color = data.gemini ? '#4ade80' : '#f87171';
+    }
+    if (chatgptBadge) {
+      chatgptBadge.textContent = data.chatgpt ? '✅ ChatGPT: connected' : '❌ ChatGPT: chưa cấu hình';
+      chatgptBadge.style.background = data.chatgpt ? '#1a3a1a' : '#3a1a1a';
+      chatgptBadge.style.color = data.chatgpt ? '#4ade80' : '#f87171';
+    }
   } catch {}
+}
+
+async function saveGeminiKey() {
+  const key = document.getElementById('set-gemini-key').value.trim();
+  if (!key) return showToast('Nhập Gemini API key', 'error');
+  
+  try {
+    const res = await fetch(API_BASE + '/api/ai-auth/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: key }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message, 'success');
+      document.getElementById('set-gemini-key').value = '';
+      checkAIStatus();
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch {
+    showToast('Lỗi lưu Gemini key', 'error');
+  }
+}
+
+async function saveChatGPTToken() {
+  const token = document.getElementById('set-chatgpt-token').value.trim();
+  if (!token) return showToast('Nhập ChatGPT session token', 'error');
+  
+  try {
+    const res = await fetch(API_BASE + '/api/ai-auth/chatgpt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionToken: token }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message, 'success');
+      document.getElementById('set-chatgpt-token').value = '';
+      checkAIStatus();
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch {
+    showToast('Lỗi lưu ChatGPT token', 'error');
+  }
 }
 
 

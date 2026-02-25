@@ -711,6 +711,37 @@ VD: {"url":"https://www.facebook.com","cookies":[...]}'
           </div>
         </section>
 
+        <!-- AI Authentication -->
+        <section class="panel settings-section">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            AI Authentication
+          </h2>
+          <div id="ai-auth-status" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap">
+            <span id="ai-gemini-badge" style="padding:4px 10px;border-radius:6px;font-size:12px;background:#333;color:#aaa">⏳ Loading...</span>
+            <span id="ai-chatgpt-badge" style="padding:4px 10px;border-radius:6px;font-size:12px;background:#333;color:#aaa">⏳ Loading...</span>
+          </div>
+          <div class="settings-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Gemini API Key <small style="opacity:.6">(Lấy tại <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">Google AI Studio</a>)</small></label>
+              <div style="display:flex;gap:8px">
+                <input type="password" id="set-gemini-key" placeholder="AIzaSy..." style="flex:1" />
+                <button class="btn btn-sm btn-primary" onclick="saveGeminiKey()" style="white-space:nowrap">💾 Lưu</button>
+              </div>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>ChatGPT Session Token <small style="opacity:.6">(Lấy tại chatgpt.com/api/auth/session)</small></label>
+              <div style="display:flex;gap:8px">
+                <input type="password" id="set-chatgpt-token" placeholder="eyJhbG..." style="flex:1" />
+                <button class="btn btn-sm btn-primary" onclick="saveChatGPTToken()" style="white-space:nowrap">💾 Lưu</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Anti-Ban -->
         <section class="panel settings-section">
           <h2>
