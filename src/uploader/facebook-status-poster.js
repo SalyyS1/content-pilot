@@ -350,10 +350,13 @@ IMPORTANT: ONLY return the story text. No meta commentary.`;
         redirect: 'follow',
       });
 
-      if (postRes.ok || postRes.status === 302) {
-        return { success: true };
+      // Read response body to verify post actually went through
+      const resHtml = await postRes.text();
+      const verification = this._verifyPostResponse(resHtml, postRes.url, postRes.status);
+      if (!verification.success) {
+        throw new Error(verification.error);
       }
-      throw new Error(`HTTP ${postRes.status}`);
+      return { success: true };
     } catch (err) {
       logger.error(`Post failed: ${err.message}`);
       return { success: false, error: err.message };
@@ -424,15 +427,82 @@ IMPORTANT: ONLY return the story text. No meta commentary.`;
         redirect: 'follow',
       });
 
-      if (postRes.ok || postRes.status === 302) {
-        logger.info('✅ Posted with image via mbasic');
-        return { success: true, hasImage: true };
+      // Read response body to verify post actually went through
+      const resHtml = await postRes.text();
+      const verification = this._verifyPostResponse(resHtml, postRes.url, postRes.status);
+      if (!verification.success) {
+        throw new Error(verification.error);
       }
-      throw new Error(`HTTP ${postRes.status}`);
+      logger.info('✅ Posted with image via mbasic');
+      return { success: true, hasImage: true };
     } catch (err) {
       logger.warn(`Photo upload failed (${err.message}), trying text only...`);
       return this._postTextOnly(cookieString, text);
     }
+  }
+
+  // ============================================
+  //  POST VERIFICATION
+  // ============================================
+
+  /**
+   * Verify Facebook post response — check if post actually went through
+   * Returns { success: true } or { success: false, error: '...' }
+   */
+  _verifyPostResponse(html, finalUrl, status) {
+    // 1) Check for login/session expired
+    if (html.includes('/login') && html.includes('password')) {
+      logger.error('❌ Facebook session expired — redirected to login page');
+      return { success: false, error: 'Cookie expired — Facebook redirected to login' };
+    }
+
+    // 2) Check for checkpoint/security check
+    if (html.includes('checkpoint') || html.includes('/checkpoint/')) {
+      logger.error('❌ Facebook account checkpointed');
+      return { success: false, error: 'Account checkpointed — Facebook requires verification' };
+    }
+
+    // 3) Check for content policy / community standards block
+    if (html.includes('community standards') || html.includes('violates our') || html.includes('removed your post')) {
+      logger.error('❌ Facebook blocked post — community standards violation');
+      return { success: false, error: 'Post blocked by Facebook community standards' };
+    }
+
+    // 4) Check for "temporarily blocked" 
+    if (html.includes('temporarily blocked') || html.includes('try again later')) {
+      logger.error('❌ Facebook temporarily blocked posting');
+      return { success: false, error: 'Temporarily blocked from posting — try again later' };
+    }
+
+    // 5) Check for error page indicators
+    if (html.includes('Something went wrong') || html.includes('error_code')) {
+      logger.error('❌ Facebook returned error page');
+      return { success: false, error: 'Facebook returned an error page' };
+    }
+
+    // 6) HTTP status not OK
+    if (status >= 400) {
+      return { success: false, error: `HTTP ${status} — post likely failed` };
+    }
+
+    // 7) Positive indicators — redirect to timeline/home means success
+    const urlLower = (finalUrl || '').toLowerCase();
+    const isTimeline = urlLower.includes('mbasic.facebook.com') && 
+      (urlLower.includes('/home') || urlLower.includes('/profile') || urlLower === 'https://mbasic.facebook.com/');
+    
+    // Success: either redirected to timeline OR response contains typical post-success HTML
+    if (isTimeline || html.includes('composer') || html.includes('timeline')) {
+      logger.debug(`✅ Post verified — redirected to: ${finalUrl}`);
+      return { success: true };
+    }
+
+    // 8) If we can't determine, log the URL and first 200 chars for debugging
+    logger.warn(`⚠️ Post verification uncertain — URL: ${finalUrl}, body preview: ${html.slice(0, 200).replace(/\n/g, ' ')}`);
+    // Be optimistic if no error indicators found and HTTP was OK
+    if (status < 400) {
+      return { success: true };
+    }
+    return { success: false, error: `Uncertain post result — HTTP ${status}` };
   }
 
   // ============================================
