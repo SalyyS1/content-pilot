@@ -3,7 +3,7 @@
 # Downloads ALL source files from GitHub and restarts PM2
 
 $base = "https://raw.githubusercontent.com/SalyyS1/content-pilot/master"
-$root = "C:\Users\Administrator\ReupVideo"
+$root = $PWD.Path
 
 Write-Host "=== FULL DEPLOY: ReupVideo ===" -ForegroundColor Cyan
 
