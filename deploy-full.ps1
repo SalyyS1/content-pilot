@@ -9,6 +9,7 @@ Write-Host "=== FULL DEPLOY: ReupVideo ===" -ForegroundColor Cyan
 
 # Create all directories
 $dirs = @(
+    "data",
     "src\accounts", "src\auth", "src\autopilot", "src\cli", "src\core",
     "src\dashboard", "src\dashboard\public", "src\downloader",
     "src\processor", "src\scheduler", "src\seo", "src\uploader"
@@ -22,6 +23,9 @@ foreach ($d in $dirs) {
 $files = @(
     # Root files
     "app.js",
+
+    # Data
+    "data/socks5.txt",
     "package.json",
 
     # Core
