@@ -391,7 +391,9 @@ export class YouTubeDownloader {
 
   _runYtdlp(args, captureOutput = false) {
     return new Promise((resolve, reject) => {
-      const proc = spawn(this.ytdlpPath, args, {
+      // Inject JS runtime flag to avoid 'No supported JavaScript runtime' error
+      const fullArgs = ['--js-runtimes', 'nodejs', ...args];
+      const proc = spawn(this.ytdlpPath, fullArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: false,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' },

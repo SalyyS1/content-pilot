@@ -153,8 +153,12 @@ async function validateFacebookCookies(cookieString) {
 
 // === NEW: Phase 7 ===
 import { AnalyticsAPI } from './analytics-api.js';
+import { AutoPilot } from '../autopilot/autopilot.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Singleton autopilot instance
+let autopilotInstance = null;
 
 /**
  * Dashboard Server (Upgraded)
@@ -331,6 +335,56 @@ export function startDashboard(options = {}) {
     try {
       bulkSetSettings(req.body);
       res.json({ message: 'Settings saved!' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // === AUTOPILOT Control endpoints ===
+
+  app.get('/api/autopilot/status', (req, res) => {
+    try {
+      if (!autopilotInstance) {
+        return res.json({ running: false, stats: null });
+      }
+      const status = autopilotInstance.getStatus();
+      res.json({ running: !!status.isRunning, stats: status });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/autopilot/start', (req, res) => {
+    try {
+      if (autopilotInstance && autopilotInstance.isRunning) {
+        return res.json({ message: 'Autopilot đang chạy rồi!', running: true });
+      }
+
+      const { targets = ['facebook'], interval = 10, maxVideos = 3 } = req.body || {};
+
+      autopilotInstance = new AutoPilot({
+        intervalMinutes: interval,
+        targets: Array.isArray(targets) ? targets : targets.split(','),
+        maxVideos,
+      });
+
+      autopilotInstance.start();
+      logger.info(`🚀 Autopilot started from dashboard (targets: ${targets}, interval: ${interval}min)`);
+      res.json({ message: '🚀 Autopilot đã bật!', running: true });
+    } catch (error) {
+      logger.error(`Autopilot start error: ${error.message}`);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/autopilot/stop', (req, res) => {
+    try {
+      if (!autopilotInstance || !autopilotInstance.isRunning) {
+        return res.json({ message: 'Autopilot chưa chạy', running: false });
+      }
+      autopilotInstance.stop();
+      logger.info('⏹️ Autopilot stopped from dashboard');
+      res.json({ message: '⏹️ Autopilot đã tắt', running: false });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

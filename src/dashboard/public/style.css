@@ -1509,3 +1509,113 @@ tr:hover td {
   .cards { grid-template-columns: 1fr; }
   .account-stats { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* === AUTOPILOT PANEL === */
+.autopilot-panel {
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  padding: 0;
+  transition: border-color 0.3s;
+}
+.autopilot-panel.running {
+  border-color: rgba(var(--green-rgb), 0.4);
+  box-shadow: 0 0 20px rgba(var(--green-rgb), 0.08);
+}
+.autopilot-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.autopilot-panel .panel-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+.autopilot-body {
+  padding: 16px 20px;
+}
+.autopilot-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.autopilot-stat {
+  text-align: center;
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+}
+.autopilot-stat-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+.autopilot-stat-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.autopilot-config {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.autopilot-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 100px;
+}
+.autopilot-config label span {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.autopilot-config select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.autopilot-config select:hover {
+  border-color: var(--border-hover);
+}
+.autopilot-config select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Autopilot button states */
+#autopilot-toggle-btn {
+  font-weight: 600;
+  transition: all 0.3s;
+}
+#autopilot-toggle-btn.running {
+  background: linear-gradient(135deg, var(--red), #dc2626);
+  box-shadow: 0 0 15px rgba(var(--red-rgb), 0.3);
+}
+#autopilot-badge.running {
+  background: rgba(var(--green-rgb), 0.15);
+  color: var(--green);
+  border-color: rgba(var(--green-rgb), 0.3);
+}
+

@@ -175,6 +175,66 @@
           </div>
         </section>
 
+        <!-- Autopilot Control Panel -->
+        <section class="panel autopilot-panel" id="autopilot-panel">
+          <div class="panel-header">
+            <h2>🚀 Auto-Pilot</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="badge" id="autopilot-badge">OFF</span>
+              <button class="btn btn-primary" id="autopilot-toggle-btn" onclick="toggleAutopilot()">▶ Bật Autopilot</button>
+            </div>
+          </div>
+          <div class="autopilot-body">
+            <div class="autopilot-stats">
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ap-sessions">0</span>
+                <span class="autopilot-stat-label">Cycles</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ap-downloaded">0</span>
+                <span class="autopilot-stat-label">Downloaded</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ap-uploaded">0</span>
+                <span class="autopilot-stat-label">Uploaded</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="ap-failed">0</span>
+                <span class="autopilot-stat-label">Failed</span>
+              </div>
+            </div>
+            <div class="autopilot-config">
+              <label>
+                <span>Targets</span>
+                <select id="ap-targets">
+                  <option value="facebook">Facebook only</option>
+                  <option value="youtube">YouTube only</option>
+                  <option value="youtube,facebook">Both</option>
+                </select>
+              </label>
+              <label>
+                <span>Interval</span>
+                <select id="ap-interval">
+                  <option value="5">5 phút</option>
+                  <option value="10" selected>10 phút</option>
+                  <option value="15">15 phút</option>
+                  <option value="30">30 phút</option>
+                  <option value="60">60 phút</option>
+                </select>
+              </label>
+              <label>
+                <span>Max/Cycle</span>
+                <select id="ap-max">
+                  <option value="1">1 video</option>
+                  <option value="3" selected>3 videos</option>
+                  <option value="5">5 videos</option>
+                  <option value="10">10 videos</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+
         <!-- 2-col grid: Health + Calendar -->
         <div class="dashboard-grid">
           <section class="panel">

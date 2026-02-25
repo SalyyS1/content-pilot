@@ -152,6 +152,7 @@ async function loadAll() {
     loadCalendar(),
     loadUploads(),
     loadQueue(),
+    loadAutopilotStatus(),
   ]);
 
   lastUpdateTime = Date.now();
@@ -734,3 +735,84 @@ function timeAgo(dateStr) {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
+
+// =============================================
+//  AUTOPILOT CONTROLS
+// =============================================
+let autopilotRunning = false;
+
+async function loadAutopilotStatus() {
+  try {
+    const status = await api('/api/autopilot/status');
+    autopilotRunning = !!status.running;
+    updateAutopilotUI(status);
+  } catch {
+    // API not ready yet
+  }
+}
+
+function updateAutopilotUI(status) {
+  const panel = document.getElementById('autopilot-panel');
+  const badge = document.getElementById('autopilot-badge');
+  const btn = document.getElementById('autopilot-toggle-btn');
+  if (!panel || !badge || !btn) return;
+
+  if (status.running) {
+    panel.classList.add('running');
+    badge.textContent = 'RUNNING';
+    badge.classList.add('running');
+    btn.textContent = '⏹ Tắt Autopilot';
+    btn.classList.add('running');
+  } else {
+    panel.classList.remove('running');
+    badge.textContent = 'OFF';
+    badge.classList.remove('running');
+    btn.textContent = '▶ Bật Autopilot';
+    btn.classList.remove('running');
+  }
+
+  // Update stats
+  if (status.stats) {
+    const s = status.stats;
+    const el = (id) => document.getElementById(id);
+    if (el('ap-sessions')) el('ap-sessions').textContent = s.sessionsRun || 0;
+    if (el('ap-downloaded')) el('ap-downloaded').textContent = s.totalDownloaded || 0;
+    if (el('ap-uploaded')) el('ap-uploaded').textContent = s.totalUploaded || 0;
+    if (el('ap-failed')) el('ap-failed').textContent = s.totalFailed || 0;
+  }
+
+  // Disable config selects when running
+  const selects = document.querySelectorAll('.autopilot-config select');
+  selects.forEach(s => s.disabled = status.running);
+}
+
+async function toggleAutopilot() {
+  const btn = document.getElementById('autopilot-toggle-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    if (autopilotRunning) {
+      const res = await api('/api/autopilot/stop', { method: 'POST' });
+      showToast(res.message || 'Autopilot đã tắt', 'info');
+    } else {
+      const targets = document.getElementById('ap-targets')?.value || 'facebook';
+      const interval = parseInt(document.getElementById('ap-interval')?.value || '10');
+      const maxVideos = parseInt(document.getElementById('ap-max')?.value || '3');
+
+      const res = await api('/api/autopilot/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targets, interval, maxVideos }),
+      });
+      showToast(res.message || 'Autopilot đã bật!', 'success');
+    }
+    // Refresh status
+    await loadAutopilotStatus();
+  } catch (error) {
+    showToast('Lỗi: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
