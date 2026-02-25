@@ -235,6 +235,52 @@
           </div>
         </section>
 
+        <!-- Status Đạo Lý Panel -->
+        <section class="panel autopilot-panel status-poster-panel" id="status-poster-panel">
+          <div class="panel-header">
+            <h2>📝 Status Đạo Lý</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="badge" id="sp-badge">OFF</span>
+              <button class="btn btn-primary" id="sp-toggle-btn" onclick="toggleStatusPoster()">▶ Bật Status</button>
+            </div>
+          </div>
+          <div class="autopilot-body">
+            <div class="autopilot-stats">
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="sp-posted">0</span>
+                <span class="autopilot-stat-label">Đã đăng</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="sp-failed">0</span>
+                <span class="autopilot-stat-label">Thất bại</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="sp-quotes">150+</span>
+                <span class="autopilot-stat-label">Quotes</span>
+              </div>
+              <div class="autopilot-stat">
+                <span class="autopilot-stat-value" id="sp-last">—</span>
+                <span class="autopilot-stat-label">Lần cuối</span>
+              </div>
+            </div>
+            <div class="autopilot-config">
+              <label>
+                <span>Interval</span>
+                <select id="sp-interval">
+                  <option value="1">1 giờ</option>
+                  <option value="2">2 giờ</option>
+                  <option value="3" selected>3 giờ</option>
+                  <option value="4">4 giờ</option>
+                  <option value="6">6 giờ</option>
+                  <option value="12">12 giờ</option>
+                </select>
+              </label>
+            </div>
+            <div id="sp-last-quote" style="margin-top:12px;padding:10px;border-radius:8px;background:var(--bg-hover);font-size:13px;color:var(--text-secondary);font-style:italic;display:none">
+            </div>
+          </div>
+        </section>
+
         <!-- 2-col grid: Health + Calendar -->
         <div class="dashboard-grid">
           <section class="panel">

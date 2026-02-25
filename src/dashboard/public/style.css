@@ -1619,3 +1619,19 @@ tr:hover td {
   border-color: rgba(var(--green-rgb), 0.3);
 }
 
+/* Status Poster specific */
+#sp-toggle-btn {
+  font-weight: 600;
+  transition: all 0.3s;
+}
+#sp-toggle-btn.running {
+  background: linear-gradient(135deg, var(--red), #dc2626);
+  box-shadow: 0 0 15px rgba(var(--red-rgb), 0.3);
+}
+#sp-badge.running {
+  background: rgba(var(--green-rgb), 0.15);
+  color: var(--green);
+  border-color: rgba(var(--green-rgb), 0.3);
+}
+
+

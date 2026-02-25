@@ -153,6 +153,7 @@ async function loadAll() {
     loadUploads(),
     loadQueue(),
     loadAutopilotStatus(),
+    loadStatusPosterStatus(),
   ]);
 
   lastUpdateTime = Date.now();
@@ -815,4 +816,88 @@ async function toggleAutopilot() {
     btn.disabled = false;
   }
 }
+
+// =============================================
+//  STATUS POSTER CONTROLS
+// =============================================
+let statusPosterRunning = false;
+
+async function loadStatusPosterStatus() {
+  try {
+    const status = await api('/api/status-poster/status');
+    statusPosterRunning = !!status.running;
+    updateStatusPosterUI(status);
+  } catch {
+    // API not ready yet
+  }
+}
+
+function updateStatusPosterUI(status) {
+  const panel = document.getElementById('status-poster-panel');
+  const badge = document.getElementById('sp-badge');
+  const btn = document.getElementById('sp-toggle-btn');
+  if (!panel || !badge || !btn) return;
+
+  if (status.running) {
+    panel.classList.add('running');
+    badge.textContent = 'RUNNING';
+    badge.classList.add('running');
+    btn.textContent = '⏹ Tắt Status';
+    btn.classList.add('running');
+  } else {
+    panel.classList.remove('running');
+    badge.textContent = 'OFF';
+    badge.classList.remove('running');
+    btn.textContent = '▶ Bật Status';
+    btn.classList.remove('running');
+  }
+
+  if (status.stats) {
+    const s = status.stats;
+    const el = (id) => document.getElementById(id);
+    if (el('sp-posted')) el('sp-posted').textContent = s.totalPosted || 0;
+    if (el('sp-failed')) el('sp-failed').textContent = s.totalFailed || 0;
+    if (el('sp-quotes')) el('sp-quotes').textContent = s.quotesAvailable || '150+';
+    if (el('sp-last')) el('sp-last').textContent = s.lastPostedAt ? timeAgo(s.lastPostedAt) : '—';
+
+    // Show last quote
+    const quoteEl = el('sp-last-quote');
+    if (quoteEl && s.lastQuote) {
+      quoteEl.textContent = `"…${s.lastQuote}"`;
+      quoteEl.style.display = 'block';
+    }
+  }
+
+  // Disable config when running
+  const sel = document.getElementById('sp-interval');
+  if (sel) sel.disabled = status.running;
+}
+
+async function toggleStatusPoster() {
+  const btn = document.getElementById('sp-toggle-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    if (statusPosterRunning) {
+      const res = await api('/api/status-poster/stop', { method: 'POST' });
+      showToast(res.message || 'Status Poster đã tắt', 'info');
+    } else {
+      const intervalHours = parseFloat(document.getElementById('sp-interval')?.value || '3');
+
+      const res = await api('/api/status-poster/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intervalHours }),
+      });
+      showToast(res.message || 'Status Poster đã bật!', 'success');
+    }
+    await loadStatusPosterStatus();
+  } catch (error) {
+    showToast('Lỗi: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 

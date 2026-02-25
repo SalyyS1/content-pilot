@@ -154,11 +154,13 @@ async function validateFacebookCookies(cookieString) {
 // === NEW: Phase 7 ===
 import { AnalyticsAPI } from './analytics-api.js';
 import { AutoPilot } from '../autopilot/autopilot.js';
+import { FacebookStatusPoster } from '../uploader/facebook-status-poster.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Singleton autopilot instance
+// Singleton instances
 let autopilotInstance = null;
+let statusPosterInstance = null;
 
 /**
  * Dashboard Server (Upgraded)
@@ -385,6 +387,54 @@ export function startDashboard(options = {}) {
       autopilotInstance.stop();
       logger.info('⏹️ Autopilot stopped from dashboard');
       res.json({ message: '⏹️ Autopilot đã tắt', running: false });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // === STATUS POSTER Control endpoints ===
+
+  app.get('/api/status-poster/status', (req, res) => {
+    try {
+      if (!statusPosterInstance) {
+        return res.json({ running: false, stats: null });
+      }
+      const status = statusPosterInstance.getStatus();
+      res.json({ running: !!status.isRunning, stats: status });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/status-poster/start', (req, res) => {
+    try {
+      if (statusPosterInstance && statusPosterInstance.isRunning) {
+        return res.json({ message: 'Status Poster đang chạy rồi!', running: true });
+      }
+
+      const { intervalHours = 3 } = req.body || {};
+
+      statusPosterInstance = new FacebookStatusPoster({
+        intervalHours: parseFloat(intervalHours),
+      });
+
+      statusPosterInstance.start();
+      logger.info(`📝 Status Poster started from dashboard (interval: ${intervalHours}h)`);
+      res.json({ message: '📝 Status Poster đã bật!', running: true });
+    } catch (error) {
+      logger.error(`Status Poster start error: ${error.message}`);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/status-poster/stop', (req, res) => {
+    try {
+      if (!statusPosterInstance || !statusPosterInstance.isRunning) {
+        return res.json({ message: 'Status Poster chưa chạy', running: false });
+      }
+      statusPosterInstance.stop();
+      logger.info('⏹️ Status Poster stopped from dashboard');
+      res.json({ message: '⏹️ Status Poster đã tắt', running: false });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
