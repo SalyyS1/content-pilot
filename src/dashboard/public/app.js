@@ -631,7 +631,18 @@ async function testAccount(id, btn) {
 }
 
 async function deleteAccount(id, btn) {
-  if (!confirm('Bạn chắc muốn xóa account này?')) return;
+  // Double-click confirmation instead of confirm() dialog
+  if (!btn.dataset.confirmDelete) {
+    btn.dataset.confirmDelete = 'true';
+    btn.innerHTML = '⚠️ Chắc chưa?';
+    btn.style.background = '#ff2222';
+    setTimeout(() => {
+      btn.dataset.confirmDelete = '';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Xóa`;
+      btn.style.background = '';
+    }, 3000);
+    return;
+  }
 
   const card = btn.closest('.account-card');
   if (card) {
@@ -641,8 +652,12 @@ async function deleteAccount(id, btn) {
   }
 
   try {
-    await fetch(API_BASE + `/api/accounts/${id}`, { method: 'DELETE' });
-    showToast('Account đã được xóa', 'success');
+    const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    showToast('Account đã được xóa ✅', 'success');
 
     // Animate out
     if (card) {
@@ -652,8 +667,9 @@ async function deleteAccount(id, btn) {
     } else {
       loadAccounts();
     }
-  } catch {
-    showToast('Xóa thất bại', 'error');
+  } catch (err) {
+    console.error('Delete account error:', err);
+    showToast('Xóa thất bại: ' + err.message, 'error');
     if (card) {
       card.style.opacity = '1';
       card.style.transform = 'scale(1)';
