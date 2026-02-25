@@ -471,7 +471,7 @@ export class AIIntegration {
   async gemini(prompt, options = {}) {
     const CLIPROXY_URL = process.env.CLIPROXY_URL || 'http://localhost:8317';
     const CLIPROXY_KEY = process.env.CLIPROXY_KEY || 'salyyy';
-    const model = options.model || 'gemini-2.0-flash';
+    const model = options.model || 'gemini-2.5-flash';
 
     // 1) Try CLIProxyAPI (OpenAI-compatible, handles OAuth internally)
     try {
