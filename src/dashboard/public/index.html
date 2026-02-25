@@ -722,11 +722,41 @@ VD: {"url":"https://www.facebook.com","cookies":[...]}'
           </h2>
           <div id="ai-auth-status" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap">
             <span id="ai-gemini-badge" style="padding:4px 10px;border-radius:6px;font-size:12px;background:#333;color:#aaa">⏳ Loading...</span>
+            <span id="ai-google-badge" style="padding:4px 10px;border-radius:6px;font-size:12px;background:#333;color:#aaa">⏳ Loading...</span>
             <span id="ai-chatgpt-badge" style="padding:4px 10px;border-radius:6px;font-size:12px;background:#333;color:#aaa">⏳ Loading...</span>
           </div>
+
+          <!-- Google OAuth (recommended) -->
+          <div style="margin-bottom:16px;padding:12px;border:1px solid rgba(99,102,241,.3);border-radius:8px;background:rgba(99,102,241,.05)">
+            <h3 style="margin:0 0 8px;font-size:13px;color:#a5b4fc">🔐 Google OAuth (Recommended — dùng acc Google của bạn)</h3>
+            <div class="settings-grid" style="margin-bottom:8px">
+              <div class="form-group">
+                <label>Client ID</label>
+                <input type="text" id="set-google-client-id" placeholder="xxxx.apps.googleusercontent.com" />
+              </div>
+              <div class="form-group">
+                <label>Client Secret</label>
+                <input type="password" id="set-google-client-secret" placeholder="GOCSPX-..." />
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="saveGoogleOAuth()" style="white-space:nowrap">💾 Lưu Credentials</button>
+              <button class="btn btn-sm btn-primary" onclick="startGoogleLogin()" id="google-login-btn" style="white-space:nowrap">🔑 Login with Google</button>
+              <span id="google-auth-label" style="font-size:12px;opacity:.7">Chưa kết nối</span>
+            </div>
+            <div id="google-device-code" style="display:none;margin-top:12px;padding:16px;background:#0f0f23;border-radius:8px;text-align:center">
+              <p style="margin:0 0 8px;font-size:13px;opacity:.8">Mở link bên dưới và nhập code:</p>
+              <a id="google-device-url" href="#" target="_blank" style="color:var(--accent);font-size:14px;text-decoration:underline"></a>
+              <p style="margin:12px 0 4px;font-size:28px;font-weight:800;letter-spacing:6px;color:#fff;font-family:'JetBrains Mono',monospace" id="google-device-code-text"></p>
+              <p style="margin:0;font-size:12px;opacity:.5" id="google-device-status">Đang chờ bạn xác nhận...</p>
+            </div>
+            <p style="margin:8px 0 0;font-size:11px;opacity:.4">Tạo OAuth client tại <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console</a> → type: "TVs and Limited Input devices"</p>
+          </div>
+
+          <!-- API Key fallback -->
           <div class="settings-grid">
             <div class="form-group" style="grid-column:1/-1">
-              <label>Gemini API Key <small style="opacity:.6">(Lấy tại <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">Google AI Studio</a>)</small></label>
+              <label>Gemini API Key <small style="opacity:.6">(Hoặc dùng API key — lấy tại <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">Google AI Studio</a>)</small></label>
               <div style="display:flex;gap:8px">
                 <input type="password" id="set-gemini-key" placeholder="AIzaSy..." style="flex:1" />
                 <button class="btn btn-sm btn-primary" onclick="saveGeminiKey()" style="white-space:nowrap">💾 Lưu</button>

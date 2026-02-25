@@ -711,18 +711,150 @@ async function checkAIStatus() {
 
     // Update settings page badges
     const geminiBadge = document.getElementById('ai-gemini-badge');
+    const googleBadge = document.getElementById('ai-google-badge');
     const chatgptBadge = document.getElementById('ai-chatgpt-badge');
+    
     if (geminiBadge) {
-      geminiBadge.textContent = data.gemini ? `✅ Gemini: ${data.geminiKeyPreview}` : '❌ Gemini: chưa cấu hình';
-      geminiBadge.style.background = data.gemini ? '#1a3a1a' : '#3a1a1a';
-      geminiBadge.style.color = data.gemini ? '#4ade80' : '#f87171';
+      if (data.googleOAuth) {
+        geminiBadge.textContent = '✅ Gemini: via OAuth';
+        geminiBadge.style.background = '#1a3a1a';
+        geminiBadge.style.color = '#4ade80';
+      } else if (data.gemini) {
+        geminiBadge.textContent = `✅ Gemini: ${data.geminiKeyPreview}`;
+        geminiBadge.style.background = '#1a3a1a';
+        geminiBadge.style.color = '#4ade80';
+      } else {
+        geminiBadge.textContent = '❌ Gemini: chưa cấu hình';
+        geminiBadge.style.background = '#3a1a1a';
+        geminiBadge.style.color = '#f87171';
+      }
+    }
+    if (googleBadge) {
+      if (data.googleOAuth) {
+        googleBadge.textContent = `🔐 Google: ${data.googleEmail}`;
+        googleBadge.style.background = '#1a2a3a';
+        googleBadge.style.color = '#60a5fa';
+      } else {
+        googleBadge.textContent = '🔐 Google: chưa đăng nhập';
+        googleBadge.style.background = '#2a2a2a';
+        googleBadge.style.color = '#888';
+      }
     }
     if (chatgptBadge) {
       chatgptBadge.textContent = data.chatgpt ? '✅ ChatGPT: connected' : '❌ ChatGPT: chưa cấu hình';
       chatgptBadge.style.background = data.chatgpt ? '#1a3a1a' : '#3a1a1a';
       chatgptBadge.style.color = data.chatgpt ? '#4ade80' : '#f87171';
     }
+    
+    // Update google auth label
+    const googleLabel = document.getElementById('google-auth-label');
+    if (googleLabel) {
+      if (data.googleOAuth) {
+        googleLabel.textContent = `✅ ${data.googleEmail}`;
+        googleLabel.style.color = '#4ade80';
+      }
+    }
   } catch {}
+}
+
+async function saveGoogleOAuth() {
+  const clientId = document.getElementById('set-google-client-id').value.trim();
+  const clientSecret = document.getElementById('set-google-client-secret').value.trim();
+  if (!clientId || !clientSecret) return showToast('Nhập Client ID và Secret', 'error');
+  
+  try {
+    const res = await fetch(API_BASE + '/api/ai-auth/google/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, clientSecret }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message, 'success');
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch {
+    showToast('Lỗi lưu Google OAuth', 'error');
+  }
+}
+
+let googlePollTimer = null;
+
+async function startGoogleLogin() {
+  try {
+    const btn = document.getElementById('google-login-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang khởi tạo...';
+    
+    const res = await fetch(API_BASE + '/api/ai-auth/google/start', { method: 'POST' });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      btn.disabled = false;
+      btn.textContent = '🔑 Login with Google';
+      showToast(data.error, 'error');
+      return;
+    }
+
+    // Show device code UI
+    document.getElementById('google-device-code').style.display = 'block';
+    document.getElementById('google-device-url').href = data.verificationUrl;
+    document.getElementById('google-device-url').textContent = data.verificationUrl;
+    document.getElementById('google-device-code-text').textContent = data.userCode;
+    document.getElementById('google-device-status').textContent = 'Đang chờ bạn xác nhận...';
+    btn.textContent = '⏳ Đang chờ xác nhận...';
+
+    // Auto-open the URL
+    window.open(data.verificationUrl, '_blank');
+
+    // Start polling
+    if (googlePollTimer) clearInterval(googlePollTimer);
+    googlePollTimer = setInterval(pollGoogleAuth, 5000);
+  } catch {
+    showToast('Lỗi bắt đầu Google login', 'error');
+    const btn = document.getElementById('google-login-btn');
+    btn.disabled = false;
+    btn.textContent = '🔑 Login with Google';
+  }
+}
+
+async function pollGoogleAuth() {
+  try {
+    const res = await fetch(API_BASE + '/api/ai-auth/google/poll', { method: 'POST' });
+    const data = await res.json();
+    
+    if (data.status === 'pending') {
+      document.getElementById('google-device-status').textContent = data.message;
+      return;
+    }
+    
+    if (data.status === 'success') {
+      clearInterval(googlePollTimer);
+      googlePollTimer = null;
+      document.getElementById('google-device-code').style.display = 'none';
+      const btn = document.getElementById('google-login-btn');
+      btn.disabled = false;
+      btn.textContent = '✅ Đã kết nối';
+      document.getElementById('google-auth-label').textContent = `✅ ${data.email || 'Connected'}`;
+      document.getElementById('google-auth-label').style.color = '#4ade80';
+      showToast(data.message, 'success');
+      checkAIStatus();
+      return;
+    }
+    
+    // Error
+    clearInterval(googlePollTimer);
+    googlePollTimer = null;
+    document.getElementById('google-device-code').style.display = 'none';
+    const btn = document.getElementById('google-login-btn');
+    btn.disabled = false;
+    btn.textContent = '🔑 Login with Google';
+    showToast(data.error || 'Login failed', 'error');
+  } catch {
+    clearInterval(googlePollTimer);
+    googlePollTimer = null;
+  }
 }
 
 async function saveGeminiKey() {

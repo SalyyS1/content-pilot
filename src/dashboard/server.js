@@ -547,7 +547,7 @@ export function startDashboard(options = {}) {
   app.get('/api/ai-status', (req, res) => {
     try {
       const tokensFile = resolve(process.cwd(), 'data', 'sessions', 'ai-tokens.json');
-      let chatgpt = false, gemini = false, geminiKeyPreview = '';
+      let chatgpt = false, gemini = false, geminiKeyPreview = '', googleOAuth = false, googleEmail = '';
       
       if (existsSync(tokensFile)) {
         const data = JSON.parse(readFileSync(tokensFile, 'utf8'));
@@ -558,9 +558,159 @@ export function startDashboard(options = {}) {
           gemini = true;
           geminiKeyPreview = data.geminiKey.slice(0, 8) + '...' + data.geminiKey.slice(-4);
         }
+        if (data.google?.refreshToken) {
+          googleOAuth = true;
+          googleEmail = data.google.email || '';
+          gemini = true; // OAuth also enables Gemini
+        }
       }
       
-      res.json({ chatgpt, gemini, geminiKeyPreview });
+      res.json({ chatgpt, gemini, geminiKeyPreview, googleOAuth, googleEmail });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // === Google OAuth Device Code Flow ===
+  let googleDeviceState = null;
+
+  app.post('/api/ai-auth/google/config', (req, res) => {
+    try {
+      const { clientId, clientSecret } = req.body;
+      if (!clientId || !clientSecret) {
+        return res.status(400).json({ error: 'Client ID và Secret required' });
+      }
+
+      const tokensFile = resolve(SESSIONS_DIR, 'ai-tokens.json');
+      let data = {};
+      if (existsSync(tokensFile)) {
+        try { data = JSON.parse(readFileSync(tokensFile, 'utf8')); } catch {}
+      }
+
+      data.google = data.google || {};
+      data.google.clientId = clientId.trim();
+      data.google.clientSecret = clientSecret.trim();
+      data.savedAt = new Date().toISOString();
+      writeFileSync(tokensFile, JSON.stringify(data, null, 2));
+
+      logger.info('🔑 Google OAuth credentials saved');
+      res.json({ message: '✅ Google OAuth credentials saved!' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/ai-auth/google/start', async (req, res) => {
+    try {
+      const tokensFile = resolve(SESSIONS_DIR, 'ai-tokens.json');
+      if (!existsSync(tokensFile)) {
+        return res.status(400).json({ error: 'Cấu hình Google OAuth credentials trước' });
+      }
+      
+      const data = JSON.parse(readFileSync(tokensFile, 'utf8'));
+      if (!data.google?.clientId) {
+        return res.status(400).json({ error: 'Chưa có Google Client ID. Nhập Client ID + Secret trước.' });
+      }
+
+      const deviceRes = await fetch('https://oauth2.googleapis.com/device/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: data.google.clientId,
+          scope: 'https://www.googleapis.com/auth/generative-language.retriever https://www.googleapis.com/auth/cloud-platform email profile',
+        }),
+      });
+
+      const deviceData = await deviceRes.json();
+      
+      if (!deviceRes.ok) {
+        return res.status(400).json({ error: deviceData.error_description || deviceData.error || 'Failed to start device flow' });
+      }
+
+      googleDeviceState = {
+        deviceCode: deviceData.device_code,
+        userCode: deviceData.user_code,
+        verificationUrl: deviceData.verification_url,
+        interval: deviceData.interval || 5,
+        expiresIn: deviceData.expires_in,
+        startedAt: Date.now(),
+      };
+
+      res.json({
+        userCode: deviceData.user_code,
+        verificationUrl: deviceData.verification_url,
+        expiresIn: deviceData.expires_in,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/ai-auth/google/poll', async (req, res) => {
+    try {
+      if (!googleDeviceState) {
+        return res.status(400).json({ error: 'Chưa bắt đầu login. Bấm Login with Google trước.' });
+      }
+
+      if (Date.now() - googleDeviceState.startedAt > googleDeviceState.expiresIn * 1000) {
+        googleDeviceState = null;
+        return res.status(400).json({ error: 'Code hết hạn. Bấm Login lại.' });
+      }
+
+      const tokensFile = resolve(SESSIONS_DIR, 'ai-tokens.json');
+      const data = JSON.parse(readFileSync(tokensFile, 'utf8'));
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: data.google.clientId,
+          client_secret: data.google.clientSecret,
+          device_code: googleDeviceState.deviceCode,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
+      });
+
+      const tokenData = await tokenRes.json();
+
+      if (tokenData.error === 'authorization_pending') {
+        return res.json({ status: 'pending', message: 'Đang chờ bạn xác nhận...' });
+      }
+      if (tokenData.error === 'slow_down') {
+        return res.json({ status: 'pending', message: 'Đang chờ... (slow down)' });
+      }
+      if (tokenData.error) {
+        googleDeviceState = null;
+        return res.status(400).json({ error: tokenData.error_description || tokenData.error });
+      }
+
+      // Success! Save tokens
+      data.google.accessToken = tokenData.access_token;
+      data.google.refreshToken = tokenData.refresh_token;
+      data.google.accessTokenExpiry = Date.now() + (tokenData.expires_in * 1000);
+
+      // Get user info
+      try {
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        if (userRes.ok) {
+          const userInfo = await userRes.json();
+          data.google.email = userInfo.email;
+          data.google.name = userInfo.name;
+        }
+      } catch {}
+
+      data.savedAt = new Date().toISOString();
+      writeFileSync(tokensFile, JSON.stringify(data, null, 2));
+      googleDeviceState = null;
+
+      logger.info(`🔑 Google OAuth connected: ${data.google.email || 'unknown'}`);
+      res.json({
+        status: 'success',
+        message: `✅ Đã kết nối: ${data.google.email || 'Google account'}`,
+        email: data.google.email,
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

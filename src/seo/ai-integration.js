@@ -32,6 +32,9 @@ export class AIIntegration {
     // Gemini
     this._geminiKey = config.geminiKey || process.env.GEMINI_API_KEY || null;
 
+    // Google OAuth (for Gemini via user's Google account)
+    this._googleAuth = null;
+
     if (!existsSync(SESSIONS_DIR)) mkdirSync(SESSIONS_DIR, { recursive: true });
     this._loadTokens();
   }
@@ -64,21 +67,39 @@ export class AIIntegration {
         this._geminiKey = data.geminiKey;
         logger.info('🔑 Gemini API key loaded');
       }
+      if (data.google?.refreshToken) {
+        this._googleAuth = {
+          clientId: data.google.clientId,
+          clientSecret: data.google.clientSecret,
+          refreshToken: data.google.refreshToken,
+          accessToken: data.google.accessToken || null,
+          accessTokenExpiry: data.google.accessTokenExpiry || 0,
+          email: data.google.email,
+        };
+        logger.info(`🔑 Google OAuth loaded (${data.google.email || 'connected'})`);
+      }
     } catch {}
   }
 
   _saveTokens() {
     try {
-      writeFileSync(TOKENS_FILE, JSON.stringify({
-        chatgpt: {
-          sessionToken: this._sessionToken,
-          sessionExpiry: this._sessionExpiry,
-          accessToken: this._accessToken,
-          accessTokenExpiry: this._accessTokenExpiry,
-        },
-        geminiKey: this._geminiKey,
-        savedAt: new Date().toISOString(),
-      }, null, 2));
+      // Read-merge-write to preserve google OAuth data saved by dashboard
+      let existing = {};
+      if (existsSync(TOKENS_FILE)) {
+        try { existing = JSON.parse(readFileSync(TOKENS_FILE, 'utf8')); } catch {}
+      }
+      existing.chatgpt = {
+        sessionToken: this._sessionToken,
+        sessionExpiry: this._sessionExpiry,
+        accessToken: this._accessToken,
+        accessTokenExpiry: this._accessTokenExpiry,
+      };
+      existing.geminiKey = this._geminiKey;
+      if (this._googleAuth) {
+        existing.google = { ...existing.google, ...this._googleAuth };
+      }
+      existing.savedAt = new Date().toISOString();
+      writeFileSync(TOKENS_FILE, JSON.stringify(existing, null, 2));
     } catch {}
   }
 
@@ -273,8 +294,50 @@ export class AIIntegration {
   // ============================================
 
   get hasChatGPT() { return !!(this._sessionToken && this._sessionExpiry > Date.now()); }
-  get hasGemini() { return !!this._geminiKey; }
+  get hasGemini() { return !!(this._geminiKey || this._googleAuth?.refreshToken); }
+  get hasGoogleOAuth() { return !!this._googleAuth?.refreshToken; }
   get hasOpenAI() { return this.hasChatGPT; }
+
+  /**
+   * Get Google OAuth access token — auto-refreshes if expired
+   */
+  async _getGoogleAccessToken() {
+    if (!this._googleAuth) return null;
+
+    // Token still valid (60s buffer)
+    if (this._googleAuth.accessToken && this._googleAuth.accessTokenExpiry > Date.now() + 60000) {
+      return this._googleAuth.accessToken;
+    }
+
+    // Refresh token
+    try {
+      logger.debug('🔄 Refreshing Google OAuth access token...');
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: this._googleAuth.clientId,
+          client_secret: this._googleAuth.clientSecret,
+          refresh_token: this._googleAuth.refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      const data = await res.json();
+      if (data.access_token) {
+        this._googleAuth.accessToken = data.access_token;
+        this._googleAuth.accessTokenExpiry = Date.now() + (data.expires_in * 1000);
+        this._saveTokens();
+        logger.debug('🔄 Google OAuth token refreshed');
+        return data.access_token;
+      }
+
+      logger.warn(`Google OAuth refresh failed: ${data.error || 'unknown'}`);
+    } catch (err) {
+      logger.warn(`Google OAuth refresh error: ${err.message}`);
+    }
+    return null;
+  }
 
   /**
    * Call ChatGPT API (via backend-api, free with session)
@@ -357,8 +420,15 @@ export class AIIntegration {
    */
   async gemini(prompt, options = {}) {
     if (!this.hasGemini) {
-      logger.warn('Gemini API key missing. Run: reup auth gemini');
+      logger.warn('Gemini not configured. Add API key or login with Google OAuth.');
       return null;
+    }
+
+    // Try Google OAuth first, fall back to API key
+    const oauthToken = await this._getGoogleAccessToken();
+    const useOAuth = !!oauthToken;
+    if (useOAuth) {
+      logger.debug('🔑 Using Google OAuth for Gemini');
     }
 
     // Model + API version combinations to try
@@ -371,21 +441,24 @@ export class AIIntegration {
 
     for (const { model, ver } of attempts) {
       try {
-        logger.debug(`🤖 Gemini: trying ${model} (${ver})...`);
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${this._geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: options.temperature || 0.7,
-                maxOutputTokens: options.maxTokens || 1024,
-              },
-            }),
-          }
-        );
+        logger.debug(`🤖 Gemini: trying ${model} (${ver})${useOAuth ? ' [OAuth]' : ''}...`);
+        const url = useOAuth
+          ? `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent`
+          : `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${this._geminiKey}`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (useOAuth) headers['Authorization'] = `Bearer ${oauthToken}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: options.temperature || 0.7,
+              maxOutputTokens: options.maxTokens || 1024,
+            },
+          }),
+        });
 
         if (response.status === 429) {
           logger.warn(`Gemini ${model}: quota exceeded, trying next...`);
