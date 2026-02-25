@@ -103,17 +103,7 @@ async function validateFacebookCookies(cookieString) {
 
     const body = await res.text();
 
-    // Check for login page indicators
-    if (body.includes('/login') && body.includes('password')) {
-      return { valid: false, reason: 'Cookie expired — mbasic redirected to login' };
-    }
-
-    // Check for checkpoint
-    if (body.includes('checkpoint') || body.includes('/checkpoint/')) {
-      return { valid: false, reason: 'Account checkpointed — requires verification' };
-    }
-
-    // Check for fb_dtsg (means we're logged in and can post)
+    // 1) Check for fb_dtsg FIRST — if found, user is definitely logged in
     const hasDtsg = body.match(/name="fb_dtsg"\s+value="([^"]+)"/);
     if (hasDtsg) {
       const nameMatch = body.match(/<title>([^<]+)<\/title>/);
@@ -121,9 +111,22 @@ async function validateFacebookCookies(cookieString) {
       return { valid: true, name, canPost: true };
     }
 
-    // Logged in but no composer form visible
-    if (res.ok && !body.includes('/login')) {
-      return { valid: true, name: null, canPost: false };
+    // 2) No fb_dtsg found — check if it's a login page
+    if (body.includes('login_form') || (body.includes('/login.php') && body.includes('password'))) {
+      return { valid: false, reason: 'Cookie expired — mbasic redirected to login' };
+    }
+
+    // 3) Check for checkpoint
+    if (body.includes('/checkpoint/') && !body.includes('fb_dtsg')) {
+      return { valid: false, reason: 'Account checkpointed — requires verification' };
+    }
+
+    // 4) Page loaded OK but no fb_dtsg — might be "browser not supported" but still logged in
+    if (res.ok) {
+      // Check for logout link as proof of login
+      if (body.includes('logout') || body.includes('mbasic_logout_button')) {
+        return { valid: true, name: null, canPost: false };
+      }
     }
 
     return { valid: false, reason: `HTTP ${res.status} — could not verify` };
