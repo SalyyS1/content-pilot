@@ -1,10 +1,120 @@
 import express from 'express';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import logger, { getLogBuffer } from '../core/logger.js';
-import { getStats, getUploads, getAccounts, addAccount, deleteAccount, getAllAccountsWithStats } from '../core/database.js';
+import { getStats, getUploads, getAccounts, getAccount, addAccount, deleteAccount, getAllAccountsWithStats, updateAccountCredentials } from '../core/database.js';
 import { bulkSetSettings, getAllSettings } from '../core/database.js';
 import config from '../core/config.js';
+
+const SESSIONS_DIR = resolve(process.cwd(), 'data', 'sessions');
+if (!existsSync(SESSIONS_DIR)) mkdirSync(SESSIONS_DIR, { recursive: true });
+
+/**
+ * Parse browser extension cookie JSON format into:
+ * - cookieString: "name=value; name2=value2" for HTTP requests
+ * - playwrightCookies: array of Playwright-compatible cookie objects
+ */
+function parseCookieInput(rawCookie) {
+  let cookieString = '';
+  let playwrightCookies = [];
+  let c_user = null;
+
+  try {
+    const parsed = JSON.parse(rawCookie);
+    if (parsed.cookies && Array.isArray(parsed.cookies)) {
+      // Browser extension format: {url, cookies: [{domain, name, value, ...}]}
+      playwrightCookies = parsed.cookies.map(c => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain || '.facebook.com',
+        path: c.path || '/',
+        httpOnly: c.httpOnly || false,
+        secure: c.secure !== false,
+        sameSite: c.sameSite === 'no_restriction' ? 'None' : (c.sameSite === 'lax' ? 'Lax' : 'None'),
+        expires: c.expirationDate || -1,
+      }));
+      cookieString = parsed.cookies.map(c => `${c.name}=${c.value}`).join('; ');
+      const cUser = parsed.cookies.find(c => c.name === 'c_user');
+      if (cUser) c_user = cUser.value;
+    } else if (Array.isArray(parsed)) {
+      // Direct array format: [{name, value, domain, ...}]
+      playwrightCookies = parsed.map(c => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain || '.facebook.com',
+        path: c.path || '/',
+        httpOnly: c.httpOnly || false,
+        secure: c.secure !== false,
+        sameSite: 'None',
+        expires: c.expirationDate || -1,
+      }));
+      cookieString = parsed.map(c => `${c.name}=${c.value}`).join('; ');
+      const cUser = parsed.find(c => c.name === 'c_user');
+      if (cUser) c_user = cUser.value;
+    }
+  } catch {
+    // Not JSON — treat as raw cookie string
+    cookieString = rawCookie;
+    // Try to extract c_user
+    const match = rawCookie.match(/c_user=([0-9]+)/);
+    if (match) c_user = match[1];
+  }
+
+  return { cookieString, playwrightCookies, c_user };
+}
+
+/**
+ * Save Playwright-compatible session file for an account
+ */
+function savePlaywrightSession(accountId, playwrightCookies) {
+  if (!playwrightCookies.length) return;
+  const storagePath = join(SESSIONS_DIR, `${accountId}.json`);
+  const storageState = {
+    cookies: playwrightCookies,
+    origins: [{
+      origin: 'https://www.facebook.com',
+      localStorage: [],
+    }],
+  };
+  writeFileSync(storagePath, JSON.stringify(storageState, null, 2));
+  logger.info(`💾 Session saved for account #${accountId}`);
+}
+
+/**
+ * Validate Facebook cookies by making an HTTP request to Facebook
+ */
+async function validateFacebookCookies(cookieString) {
+  try {
+    const res = await fetch('https://www.facebook.com/me', {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieString,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'manual',
+    });
+
+    // Facebook redirects /me to the profile if cookies are valid
+    const location = res.headers.get('location') || '';
+    const status = res.status;
+
+    if (status === 302 && location.includes('facebook.com') && !location.includes('login')) {
+      return { valid: true, redirect: location, name: null };
+    }
+    if (status === 200) {
+      // Might be the profile page itself
+      const body = await res.text();
+      const nameMatch = body.match(/"NAME":"([^"]+)"/i) || body.match(/title>([^<]+)<\/title/);
+      return { valid: true, name: nameMatch ? nameMatch[1] : null };
+    }
+    return { valid: false, reason: `HTTP ${status}, redirect: ${location}` };
+  } catch (err) {
+    return { valid: false, reason: err.message };
+  }
+}
 
 // === NEW: Phase 7 ===
 import { AnalyticsAPI } from './analytics-api.js';
@@ -70,17 +180,36 @@ export function startDashboard(options = {}) {
       if (!platform || !name) {
         return res.status(400).json({ error: 'Platform and name are required' });
       }
+
       const credentials = {};
-      if (cookie) credentials.cookie = cookie;
       if (email) credentials.email = email;
       if (pages) credentials.pages = pages.split(',').map(p => p.trim());
+
+      // Parse cookie input (supports browser extension JSON, raw string, etc.)
+      let parsedCookie = null;
+      if (cookie) {
+        parsedCookie = parseCookieInput(cookie);
+        credentials.cookie = parsedCookie.cookieString;
+        credentials.rawCookie = cookie; // Keep original for reference
+        if (parsedCookie.c_user) credentials.c_user = parsedCookie.c_user;
+      }
 
       const result = addAccount(platform, name, cookie ? 'cookie' : 'api', credentials, {
         pageId: null,
         channelId: null,
       });
-      res.json({ id: result.lastInsertRowid, message: 'Account added!' });
+
+      const accountId = result.lastInsertRowid;
+
+      // Save Playwright session file if we have parsed cookies
+      if (parsedCookie && parsedCookie.playwrightCookies.length > 0) {
+        savePlaywrightSession(accountId, parsedCookie.playwrightCookies);
+      }
+
+      logger.info(`✅ Account added: #${accountId} (${platform}/${name}) c_user=${parsedCookie?.c_user || 'N/A'}`);
+      res.json({ id: accountId, message: 'Account added!', c_user: parsedCookie?.c_user });
     } catch (error) {
+      logger.error(`❌ Add account error: ${error.message}`);
       res.status(500).json({ error: error.message });
     }
   });
@@ -94,10 +223,47 @@ export function startDashboard(options = {}) {
     }
   });
 
-  app.post('/api/accounts/:id/test', (req, res) => {
+  app.post('/api/accounts/:id/test', async (req, res) => {
     try {
-      res.json({ message: 'Account is active! ✅' });
+      const account = getAccount(parseInt(req.params.id));
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      let credentials;
+      try {
+        credentials = JSON.parse(account.credentials || '{}');
+      } catch {
+        credentials = {};
+      }
+
+      if (!credentials.cookie) {
+        return res.json({ status: 'warning', message: '⚠️ No cookie stored for this account' });
+      }
+
+      if (account.platform === 'facebook') {
+        const result = await validateFacebookCookies(credentials.cookie);
+        if (result.valid) {
+          logger.info(`✅ Account #${req.params.id} cookie is valid`);
+          return res.json({
+            status: 'success',
+            message: `✅ Cookie hợp lệ!${result.name ? ' (' + result.name + ')' : ''}`,
+            valid: true,
+          });
+        } else {
+          logger.warn(`❌ Account #${req.params.id} cookie invalid: ${result.reason}`);
+          return res.json({
+            status: 'error',
+            message: `❌ Cookie không hợp lệ hoặc đã hết hạn: ${result.reason}`,
+            valid: false,
+          });
+        }
+      }
+
+      // For other platforms, basic check
+      res.json({ status: 'success', message: '✅ Account data exists' });
     } catch (error) {
+      logger.error(`Test account error: ${error.message}`);
       res.status(500).json({ error: error.message });
     }
   });

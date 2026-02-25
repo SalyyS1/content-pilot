@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 import config from '../core/config.js';
 import logger from '../core/logger.js';
-import { addAccount, getAccounts, updateAccountCredentials } from '../core/database.js';
+import { addAccount, getAccount, getAccounts, updateAccountCredentials } from '../core/database.js';
 
 /**
  * Auth Manager - handles authentication for YouTube (API) and Facebook (Browser)
@@ -138,14 +138,20 @@ export class AuthManager {
     logger.info('Waiting for login... (close browser when done)');
 
     try {
-      // Wait until we're on the main FB page (logged in)
-      await page.waitForURL('**/facebook.com/**', {
-        timeout: 300000, // 5 min timeout
-        waitUntil: 'domcontentloaded',
-      });
+      // Wait until we leave the login page (user successfully logged in)
+      // Bug fix: old pattern '**/facebook.com/**' matched the login page itself
+      await page.waitForFunction(() => {
+        const url = window.location.href;
+        return (
+          url.includes('facebook.com') &&
+          !url.includes('/login') &&
+          !url.includes('/checkpoint') &&
+          !url.includes('/recover')
+        );
+      }, { timeout: 300000 }); // 5 min timeout
 
       // Give extra time for cookies to settle
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(5000);
 
       // Extract cookies
       const cookies = await context.cookies();
@@ -249,17 +255,30 @@ export class AuthManager {
 
   /**
    * Load Facebook Playwright context with saved cookies
+   * @param {Object} options
+   * @param {number} options.accountId - specific account ID (supports account rotation)
+   * @param {boolean} options.headless - run headless (default: true)
    */
   async getFacebookContext(options = {}) {
-    const accounts = getAccounts('facebook');
-    if (accounts.length === 0) {
-      throw new Error('No Facebook account configured. Run: video-reup auth login facebook');
+    let account;
+
+    if (options.accountId) {
+      // Bug #2 fix: load specific account instead of always using [0]
+      account = getAccount(options.accountId);
+      if (!account || account.platform !== 'facebook') {
+        throw new Error(`Facebook account #${options.accountId} not found`);
+      }
+    } else {
+      const accounts = getAccounts('facebook');
+      if (accounts.length === 0) {
+        throw new Error('No Facebook account configured. Run: video-reup auth login facebook');
+      }
+      account = accounts[0];
     }
 
-    const creds = JSON.parse(accounts[0].credentials);
-    if (!creds.cookies || creds.cookies.length === 0) {
-      throw new Error('No Facebook cookies found. Please re-login.');
-    }
+    const accountId = account.id;
+    const sessionsDir = resolve(config.dataDir, 'sessions');
+    const sessionPath = resolve(sessionsDir, `${accountId}.json`);
 
     const { chromium } = await import('playwright');
     const browser = await chromium.launch({
@@ -267,14 +286,61 @@ export class AuthManager {
       args: ['--disable-blink-features=AutomationControlled'],
     });
 
+    // Bug #5 fix: Try loading session file first (saved by dashboard)
+    if (existsSync(sessionPath)) {
+      try {
+        const storageState = JSON.parse(readFileSync(sessionPath, 'utf-8'));
+        const context = await browser.newContext({
+          viewport: { width: 1280, height: 800 },
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          storageState,
+        });
+        logger.info(`Loaded session file for account #${accountId}`);
+        return { browser, context, account };
+      } catch (e) {
+        logger.warn(`Session file invalid for #${accountId}, falling back to DB cookies: ${e.message}`);
+      }
+    }
+
+    // Fallback: load cookies from database
+    const creds = JSON.parse(account.credentials || '{}');
+    let cookies = null;
+
+    // Bug #1 fix: handle both cookie formats
+    if (creds.cookies && Array.isArray(creds.cookies)) {
+      // Format A: array of Playwright cookie objects (from browser login)
+      cookies = creds.cookies;
+    } else if (creds.cookie && typeof creds.cookie === 'string') {
+      // Format B: cookie string from dashboard ("c_user=xxx; xs=yyy")
+      // Convert to Playwright format
+      cookies = creds.cookie.split(';').map(pair => {
+        const [name, ...rest] = pair.trim().split('=');
+        return {
+          name: name.trim(),
+          value: rest.join('=').trim(),
+          domain: '.facebook.com',
+          path: '/',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'None',
+        };
+      }).filter(c => c.name && c.value);
+    }
+
+    if (!cookies || cookies.length === 0) {
+      await browser.close();
+      throw new Error(`No Facebook cookies found for account #${accountId}. Please re-login.`);
+    }
+
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     });
 
-    await context.addCookies(creds.cookies);
+    await context.addCookies(cookies);
+    logger.info(`Loaded ${cookies.length} cookies from DB for account #${accountId}`);
 
-    return { browser, context, account: accounts[0] };
+    return { browser, context, account };
   }
 
   /**

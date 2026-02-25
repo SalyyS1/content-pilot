@@ -19,8 +19,12 @@ export class FacebookUploader {
   /**
    * Upload a video as Facebook Reel
    * Auto-selects method based on available auth
+   * @param {string} filePath - path to video file
+   * @param {Object} metadata - title, description, hashtags
+   * @param {number} uploadId - database upload record ID
+   * @param {number} accountId - specific account ID for account rotation
    */
-  async upload(filePath, metadata = {}, uploadId = null) {
+  async upload(filePath, metadata = {}, uploadId = null, accountId = null) {
     if (!existsSync(filePath)) {
       throw new Error(`Video file not found: ${filePath}`);
     }
@@ -37,8 +41,8 @@ export class FacebookUploader {
       }
     }
 
-    // Fallback to browser method
-    return await this._uploadViaBrowser(filePath, metadata, uploadId);
+    // Fallback to browser method (pass accountId for rotation)
+    return await this._uploadViaBrowser(filePath, metadata, uploadId, accountId);
   }
 
   // =====================================================
@@ -131,8 +135,8 @@ export class FacebookUploader {
   // Method 2: Browser Automation Upload
   // =====================================================
 
-  async _uploadViaBrowser(filePath, metadata, uploadId) {
-    logger.info('Uploading Facebook Reel via browser automation...');
+  async _uploadViaBrowser(filePath, metadata, uploadId, accountId = null) {
+    logger.info(`Uploading Facebook Reel via browser automation${accountId ? ` (account #${accountId})` : ''}...`);
     if (uploadId) updateUpload(uploadId, { status: 'uploading' });
 
     const { AuthManager } = await import('../auth/auth-manager.js');
@@ -140,27 +144,15 @@ export class FacebookUploader {
 
     let browser, context;
     try {
-      ({ browser, context } = await authManager.getFacebookContext({ headless: false }));
+      // Bug #3 fix: pass accountId so correct account's cookies are loaded
+      ({ browser, context } = await authManager.getFacebookContext({
+        headless: false,
+        accountId: accountId || undefined,
+      }));
 
       const page = await context.newPage();
 
-      // Navigate to Facebook Reels creator
-      // For Pages, we go through Creator Studio / Meta Business Suite
-      const pageId = config.facebook.pageId;
-      let creatorUrl;
-
-      if (pageId) {
-        // Meta Business Suite → Create Reel
-        creatorUrl = `https://business.facebook.com/latest/home?asset_id=${pageId}`;
-      } else {
-        // Personal -> Creator studio
-        creatorUrl = 'https://www.facebook.com/reels/create';
-      }
-
-      await page.goto(creatorUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(3000);
-
-      // Method: Direct Facebook Reels creation
+      // Bug #6 fix: Navigate directly to Reels creation page (removed redundant first navigation)
       await page.goto('https://www.facebook.com/reels/create', { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(3000);
 

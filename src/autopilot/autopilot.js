@@ -204,6 +204,7 @@ export class AutoPilot {
             platform: target,
             format,
             niche: format,
+            accountId: account.id,  // Bug #4 fix: pass accountId for health tracking + rotation
             title: optimized.title,
             description: optimized.description,
             hashtags: optimized.hashtags,
@@ -239,16 +240,17 @@ export class AutoPilot {
   }
 
   async _handleUpload(payload) {
-    const { uploadId, filePath, platform, title, description, hashtags, tags } = payload;
+    const { uploadId, filePath, platform, title, description, hashtags, tags, accountId } = payload;
 
     if (platform === 'youtube') {
       return await this.ytUploader.upload(filePath, {
         title, description, hashtags, tags,
       }, uploadId);
     } else if (platform === 'facebook') {
+      // Bug #4 fix: pass accountId so correct account's cookies are used
       return await this.fbUploader.upload(filePath, {
         title, description, hashtags,
-      }, uploadId);
+      }, uploadId, accountId);
     }
 
     throw new Error(`Unknown platform: ${platform}`);
@@ -301,12 +303,12 @@ export class AutoPilot {
         hashtags: optimized.hashtags,
       });
 
-      // Upload directly
+      // Upload directly (pass accountId for correct cookie loading)
       if (target === 'youtube') {
         const result = await this.ytUploader.upload(uploadPath, optimized, uploadResult.lastInsertRowid);
         results.push(result);
       } else {
-        const result = await this.fbUploader.upload(uploadPath, optimized, uploadResult.lastInsertRowid);
+        const result = await this.fbUploader.upload(uploadPath, optimized, uploadResult.lastInsertRowid, account.id);
         results.push(result);
       }
     }
