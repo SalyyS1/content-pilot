@@ -186,16 +186,16 @@ IMPORTANT: ONLY return the title and story. No labels like "Part 1" or "Title:".
 
     let result = null;
 
-    // Try ChatGPT first
-    if (this.ai.hasChatGPT) {
-      logger.info('🤖 Trying ChatGPT for story...');
-      result = await this.ai.chatgpt(prompt, { temperature: 0.85 });
+    // Try Gemini first (ChatGPT token often expires)
+    if (this.ai.hasGemini) {
+      logger.info('✨ Generating story with Gemini...');
+      result = await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
     }
 
-    // Fallback to Gemini
-    if (!result && this.ai.hasGemini) {
-      logger.info('✨ ChatGPT unavailable, trying Gemini...');
-      result = await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
+    // Fallback to ChatGPT
+    if (!result && this.ai.hasChatGPT) {
+      logger.info('🤖 Gemini failed, trying ChatGPT...');
+      result = await this.ai.chatgpt(prompt, { temperature: 0.85 });
     }
 
     if (!result) {
@@ -232,12 +232,11 @@ FORMAT: Just write the story continuation. No title needed. No "Part 2" label.
 IMPORTANT: ONLY return the story text. No meta commentary.`;
 
     let result = null;
-    if (this.ai.hasChatGPT) {
-      result = await this.ai.chatgpt(prompt, { temperature: 0.85 });
-    }
-    if (!result && this.ai.hasGemini) {
-      logger.info('✨ Trying Gemini for Part 2...');
+    if (this.ai.hasGemini) {
       result = await this.ai.gemini(prompt, { temperature: 0.85, maxTokens: 2048 });
+    }
+    if (!result && this.ai.hasChatGPT) {
+      result = await this.ai.chatgpt(prompt, { temperature: 0.85 });
     }
     return result;
   }

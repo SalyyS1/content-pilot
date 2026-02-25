@@ -352,7 +352,8 @@ export class AIIntegration {
   }
 
   /**
-   * Call Gemini API (via API key, free 15 RPM)
+   * Call Gemini API — multi-model fallback chain
+   * Tries: gemini-2.0-flash → gemini-1.5-flash → gemini-pro
    */
   async gemini(prompt, options = {}) {
     if (!this.hasGemini) {
@@ -360,56 +361,64 @@ export class AIIntegration {
       return null;
     }
 
-    try {
-      const model = options.model || 'gemini-2.0-flash';
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this._geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: options.temperature || 0.7,
-              maxOutputTokens: options.maxTokens || 1024,
-            },
-          }),
+    const models = [
+      options.model || 'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-pro',
+    ];
+
+    for (const model of models) {
+      try {
+        logger.debug(`🤖 Gemini: trying model ${model}...`);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this._geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: options.temperature || 0.7,
+                maxOutputTokens: options.maxTokens || 1024,
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => '');
+          logger.warn(`Gemini ${model} HTTP ${response.status}: ${errBody.slice(0, 150)}`);
+          continue; // Try next model
         }
-      );
 
-      if (!response.ok) {
-        const errBody = await response.text();
-        logger.warn(`Gemini HTTP ${response.status}: ${errBody.slice(0, 200)}`);
-        return null;
+        const data = await response.json();
+        const candidate = data?.candidates?.[0];
+
+        if (!candidate) {
+          const errMsg = data?.error?.message || 'No candidates returned';
+          logger.warn(`Gemini ${model}: ${errMsg}`);
+          continue;
+        }
+
+        if (candidate.finishReason === 'SAFETY') {
+          logger.warn(`Gemini ${model}: blocked by safety filter`);
+          continue;
+        }
+
+        const text = candidate?.content?.parts?.[0]?.text;
+        if (text && text.trim().length > 10) {
+          logger.info(`✨ Gemini OK (${model}): ${text.trim().slice(0, 80)}...`);
+          return text.trim();
+        }
+
+        logger.warn(`Gemini ${model}: empty/short response (finishReason=${candidate.finishReason})`);
+      } catch (err) {
+        logger.warn(`Gemini ${model} error: ${err.message}`);
       }
-
-      const data = await response.json();
-
-      // Check for safety filter blocks
-      const candidate = data?.candidates?.[0];
-      if (candidate?.finishReason === 'SAFETY') {
-        logger.warn('Gemini: blocked by safety filter');
-        return null;
-      }
-      if (!candidate) {
-        // API error in body (quota, model not found, etc.)
-        const errMsg = data?.error?.message || JSON.stringify(data).slice(0, 200);
-        logger.warn(`Gemini API error: ${errMsg}`);
-        return null;
-      }
-
-      const text = candidate?.content?.parts?.[0]?.text;
-      if (text) {
-        logger.debug(`✨ Gemini OK: ${text.slice(0, 80)}...`);
-        return text.trim();
-      }
-
-      logger.warn(`Gemini: empty response. finishReason=${candidate.finishReason}`);
-      return null;
-    } catch (err) {
-      logger.warn(`Gemini API failed: ${err.message}`);
-      return null;
     }
+
+    logger.error('❌ All Gemini models failed');
+    return null;
   }
 
   // ============================================
