@@ -464,50 +464,59 @@ export class AIIntegration {
    * Call Gemini API — multi-model fallback chain
    * Tries multiple models with both v1beta and v1 endpoints
    */
+  /**
+   * Call Gemini API — try CLIProxyAPI first, then direct API
+   * CLIProxyAPI runs on localhost:8317 with OpenAI-compatible format
+   */
   async gemini(prompt, options = {}) {
-    if (!this.hasGemini) {
-      logger.warn('Gemini not configured. Add API key or login with Google OAuth.');
-      return null;
+    const CLIPROXY_URL = process.env.CLIPROXY_URL || 'http://localhost:8317';
+    const model = options.model || 'gemini-2.0-flash';
+
+    // 1) Try CLIProxyAPI (OpenAI-compatible, handles OAuth internally)
+    try {
+      logger.debug(`🤖 Gemini via CLIProxyAPI: ${model}...`);
+      const response = await fetch(`${CLIPROXY_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: options.temperature || 0.7,
+          max_tokens: options.maxTokens || 1024,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (text && text.trim().length > 10) {
+          logger.info(`✨ Gemini OK (CLIProxy ${model}): ${text.trim().slice(0, 80)}...`);
+          return text.trim();
+        }
+        logger.warn(`Gemini CLIProxy: empty response`);
+      } else {
+        const errBody = await response.text().catch(() => '');
+        logger.warn(`Gemini CLIProxy HTTP ${response.status}: ${errBody.slice(0, 150)}`);
+      }
+    } catch (err) {
+      logger.debug(`CLIProxyAPI not available: ${err.message}`);
     }
 
-    // Model + API version combinations to try
-    const attempts = [
-      { model: options.model || 'gemini-2.0-flash', ver: 'v1beta' },
-      { model: 'gemini-2.0-flash-lite', ver: 'v1beta' },
-      { model: 'gemini-1.5-flash', ver: 'v1' },
-      { model: 'gemini-1.5-pro', ver: 'v1' },
-    ];
+    // 2) Fallback: direct Google API with API key
+    if (this._geminiKey) {
+      const attempts = [
+        { model, ver: 'v1beta' },
+        { model: 'gemini-2.0-flash-lite', ver: 'v1beta' },
+        { model: 'gemini-1.5-flash', ver: 'v1' },
+      ];
 
-    // Try OAuth first, then API key
-    const oauthToken = await this._getGoogleAccessToken();
-    const authMethods = [];
-    if (oauthToken) authMethods.push({ type: 'oauth', token: oauthToken });
-    if (this._geminiKey) authMethods.push({ type: 'apikey', key: this._geminiKey });
-
-    if (authMethods.length === 0) {
-      logger.warn('Gemini: no OAuth token or API key available');
-      return null;
-    }
-
-    for (const auth of authMethods) {
-      const label = auth.type === 'oauth' ? '[OAuth]' : '[API Key]';
-      logger.debug(`🔑 Trying Gemini with ${label}`);
-
-      for (const { model, ver } of attempts) {
+      for (const { model: m, ver } of attempts) {
         try {
-          logger.debug(`🤖 Gemini: trying ${model} (${ver}) ${label}...`);
-          
-          let url, headers = { 'Content-Type': 'application/json' };
-          if (auth.type === 'oauth') {
-            url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent`;
-            headers['Authorization'] = `Bearer ${auth.token}`;
-          } else {
-            url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${auth.key}`;
-          }
-
+          logger.debug(`🤖 Gemini direct: ${m} (${ver}) [API Key]...`);
+          const url = `https://generativelanguage.googleapis.com/${ver}/models/${m}:generateContent?key=${this._geminiKey}`;
           const response = await fetch(url, {
             method: 'POST',
-            headers,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
@@ -518,54 +527,35 @@ export class AIIntegration {
           });
 
           if (response.status === 429) {
-            logger.warn(`Gemini ${model}: quota exceeded, trying next...`);
+            logger.warn(`Gemini ${m}: quota exceeded, trying next...`);
             await new Promise(r => setTimeout(r, 2000));
             continue;
           }
 
-          // OAuth scope failure → skip all OAuth attempts, try API key
-          if (response.status === 403 && auth.type === 'oauth') {
-            const errBody = await response.text().catch(() => '');
-            if (errBody.includes('insufficient authentication scopes') || errBody.includes('PERMISSION_DENIED')) {
-              logger.warn(`Gemini OAuth: insufficient scopes, falling back to API key...`);
-              break; // Break inner loop → try next auth method (API key)
-            }
-          }
-
           if (!response.ok) {
             const errBody = await response.text().catch(() => '');
-            logger.warn(`Gemini ${model} HTTP ${response.status}: ${errBody.slice(0, 150)}`);
+            logger.warn(`Gemini ${m} HTTP ${response.status}: ${errBody.slice(0, 150)}`);
             continue;
           }
 
           const data = await response.json();
           const candidate = data?.candidates?.[0];
-
-          if (!candidate) {
-            const errMsg = data?.error?.message || 'No candidates returned';
-            logger.warn(`Gemini ${model}: ${errMsg}`);
+          if (candidate?.finishReason === 'SAFETY') {
+            logger.warn(`Gemini ${m}: blocked by safety filter`);
             continue;
           }
-
-          if (candidate.finishReason === 'SAFETY') {
-            logger.warn(`Gemini ${model}: blocked by safety filter`);
-            continue;
-          }
-
           const text = candidate?.content?.parts?.[0]?.text;
           if (text && text.trim().length > 10) {
-            logger.info(`✨ Gemini OK (${model}) ${label}: ${text.trim().slice(0, 80)}...`);
+            logger.info(`✨ Gemini OK (${m}) [API Key]: ${text.trim().slice(0, 80)}...`);
             return text.trim();
           }
-
-          logger.warn(`Gemini ${model}: empty/short response (finishReason=${candidate.finishReason})`);
         } catch (err) {
-          logger.warn(`Gemini ${model} error: ${err.message}`);
+          logger.warn(`Gemini ${m} error: ${err.message}`);
         }
       }
     }
 
-    logger.error('❌ All Gemini models failed');
+    logger.error('❌ Gemini failed (CLIProxy + direct API)');
     return null;
   }
 
