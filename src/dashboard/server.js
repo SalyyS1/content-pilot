@@ -547,12 +547,17 @@ export function startDashboard(options = {}) {
   app.get('/api/ai-status', (req, res) => {
     try {
       const tokensFile = resolve(process.cwd(), 'data', 'sessions', 'ai-tokens.json');
-      let chatgpt = false, gemini = false, geminiKeyPreview = '', googleOAuth = false, googleEmail = '';
+      let chatgpt = false, gemini = false, geminiKeyPreview = '', googleOAuth = false, googleEmail = '', openaiKey = false, openaiKeyPreview = '';
       
       if (existsSync(tokensFile)) {
         const data = JSON.parse(readFileSync(tokensFile, 'utf8'));
         if (data.chatgpt?.sessionToken) {
           chatgpt = data.chatgpt.sessionExpiry > Date.now();
+        }
+        if (data.openaiKey) {
+          openaiKey = true;
+          chatgpt = true; // API key also enables ChatGPT
+          openaiKeyPreview = data.openaiKey.slice(0, 7) + '...' + data.openaiKey.slice(-4);
         }
         if (data.geminiKey) {
           gemini = true;
@@ -561,11 +566,11 @@ export function startDashboard(options = {}) {
         if (data.google?.refreshToken) {
           googleOAuth = true;
           googleEmail = data.google.email || '';
-          gemini = true; // OAuth also enables Gemini
+          gemini = true;
         }
       }
       
-      res.json({ chatgpt, gemini, geminiKeyPreview, googleOAuth, googleEmail });
+      res.json({ chatgpt, gemini, geminiKeyPreview, googleOAuth, googleEmail, openaiKey, openaiKeyPreview });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -810,6 +815,57 @@ export function startDashboard(options = {}) {
 
       logger.info('🔑 ChatGPT session token saved from dashboard');
       res.json({ message: '✅ ChatGPT token đã lưu! Restart Story Writer để áp dụng.' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // === OpenAI API Key (official, paid) ===
+  app.post('/api/ai-auth/openai', async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      if (!apiKey || apiKey.length < 10) {
+        return res.status(400).json({ error: 'API key không hợp lệ' });
+      }
+
+      // Validate by making a real API call
+      const testRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'Say OK' }],
+          max_tokens: 5,
+        }),
+      });
+
+      if (!testRes.ok) {
+        const errBody = await testRes.text().catch(() => '');
+        return res.status(400).json({ error: `❌ API key không hoạt động (HTTP ${testRes.status}). Kiểm tra lại key tại platform.openai.com` });
+      }
+
+      // Key works — save it
+      const sessionsDir = resolve(process.cwd(), 'data', 'sessions');
+      if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true });
+
+      const tokensFile = resolve(sessionsDir, 'ai-tokens.json');
+      let data = {};
+      if (existsSync(tokensFile)) {
+        try { data = JSON.parse(readFileSync(tokensFile, 'utf8')); } catch {}
+      }
+
+      data.openaiKey = apiKey.trim();
+      data.savedAt = new Date().toISOString();
+      writeFileSync(tokensFile, JSON.stringify(data, null, 2));
+
+      logger.info('🔑 OpenAI API key saved + validated');
+      res.json({
+        message: '✅ OpenAI API key hoạt động! (gpt-4o-mini)',
+        openaiKeyPreview: apiKey.slice(0, 7) + '...' + apiKey.slice(-4),
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

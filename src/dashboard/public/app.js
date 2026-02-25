@@ -741,9 +741,19 @@ async function checkAIStatus() {
       }
     }
     if (chatgptBadge) {
-      chatgptBadge.textContent = data.chatgpt ? '✅ ChatGPT: connected' : '❌ ChatGPT: chưa cấu hình';
-      chatgptBadge.style.background = data.chatgpt ? '#1a3a1a' : '#3a1a1a';
-      chatgptBadge.style.color = data.chatgpt ? '#4ade80' : '#f87171';
+      if (data.openaiKey) {
+        chatgptBadge.textContent = `✅ OpenAI: ${data.openaiKeyPreview}`;
+        chatgptBadge.style.background = '#1a3a1a';
+        chatgptBadge.style.color = '#4ade80';
+      } else if (data.chatgpt) {
+        chatgptBadge.textContent = '✅ ChatGPT: session token';
+        chatgptBadge.style.background = '#1a3a1a';
+        chatgptBadge.style.color = '#4ade80';
+      } else {
+        chatgptBadge.textContent = '❌ ChatGPT: chưa cấu hình';
+        chatgptBadge.style.background = '#3a1a1a';
+        chatgptBadge.style.color = '#f87171';
+      }
     }
     
     // Update google auth label
@@ -854,6 +864,29 @@ async function pollGoogleAuth() {
   } catch {
     clearInterval(googlePollTimer);
     googlePollTimer = null;
+  }
+}
+
+async function saveOpenAIKey() {
+  const key = document.getElementById('set-openai-key').value.trim();
+  if (!key) return showToast('Nhập OpenAI API key', 'error');
+  
+  try {
+    const res = await fetch(API_BASE + '/api/ai-auth/openai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: key }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message, 'success');
+      document.getElementById('set-openai-key').value = '';
+      checkAIStatus();
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch {
+    showToast('Lỗi lưu OpenAI key', 'error');
   }
 }
 

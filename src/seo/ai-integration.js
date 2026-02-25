@@ -23,11 +23,14 @@ const TOKENS_FILE = join(SESSIONS_DIR, 'ai-tokens.json');
 
 export class AIIntegration {
   constructor(config = {}) {
-    // ChatGPT
-    this._sessionToken = null;    // lasts ~3 months
-    this._accessToken = null;     // auto-refreshed from session
+    // ChatGPT (session token — unofficial)
+    this._sessionToken = null;
+    this._accessToken = null;
     this._accessTokenExpiry = 0;
     this._sessionExpiry = 0;
+
+    // OpenAI API key (official)
+    this._openaiKey = config.openaiKey || process.env.OPENAI_API_KEY || null;
 
     // Gemini
     this._geminiKey = config.geminiKey || process.env.GEMINI_API_KEY || null;
@@ -67,6 +70,10 @@ export class AIIntegration {
         this._geminiKey = data.geminiKey;
         logger.info('🔑 Gemini API key loaded');
       }
+      if (data.openaiKey) {
+        this._openaiKey = data.openaiKey;
+        logger.info('🔑 OpenAI API key loaded');
+      }
       if (data.google?.refreshToken) {
         this._googleAuth = {
           clientId: data.google.clientId,
@@ -95,6 +102,7 @@ export class AIIntegration {
         accessTokenExpiry: this._accessTokenExpiry,
       };
       existing.geminiKey = this._geminiKey;
+      existing.openaiKey = this._openaiKey;
       if (this._googleAuth) {
         existing.google = { ...existing.google, ...this._googleAuth };
       }
@@ -293,7 +301,8 @@ export class AIIntegration {
   // API Calls
   // ============================================
 
-  get hasChatGPT() { return !!(this._sessionToken && this._sessionExpiry > Date.now()); }
+  get hasChatGPT() { return !!(this._openaiKey || (this._sessionToken && this._sessionExpiry > Date.now())); }
+  get hasOpenAIKey() { return !!this._openaiKey; }
   get hasGemini() { return !!(this._geminiKey || this._googleAuth?.refreshToken); }
   get hasGoogleOAuth() { return !!this._googleAuth?.refreshToken; }
   get hasOpenAI() { return this.hasChatGPT; }
@@ -340,12 +349,51 @@ export class AIIntegration {
   }
 
   /**
-   * Call ChatGPT API (via backend-api, free with session)
+   * Call ChatGPT/OpenAI API
+   * Priority: OpenAI API key (official) → Session token (unofficial)
    */
   async chatgpt(prompt, options = {}) {
+    // === Method 1: Official OpenAI API (if api key available) ===
+    if (this._openaiKey) {
+      try {
+        const model = options.model || 'gpt-4o-mini';
+        logger.debug(`🤖 OpenAI API: using ${model}...`);
+        
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this._openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: options.temperature || 0.7,
+            max_tokens: options.maxTokens || 1024,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const result = data?.choices?.[0]?.message?.content;
+          if (result) {
+            logger.info(`✨ OpenAI OK (${model}): ${result.trim().slice(0, 80)}...`);
+            return result.trim();
+          }
+        } else {
+          const errBody = await response.text().catch(() => '');
+          logger.warn(`OpenAI API HTTP ${response.status}: ${errBody.slice(0, 150)}`);
+          // Don't return — fall through to session token
+        }
+      } catch (err) {
+        logger.warn(`OpenAI API error: ${err.message}`);
+      }
+    }
+
+    // === Method 2: Session token (unofficial, free) ===
     const token = await this.getAccessToken();
     if (!token) {
-      logger.warn('ChatGPT: no valid token. Run: reup auth chatgpt');
+      logger.warn('ChatGPT: no valid token or API key.');
       return null;
     }
 
@@ -373,19 +421,17 @@ export class AIIntegration {
 
       if (response.status === 401 || response.status === 403) {
         if (options._retried) {
-          logger.warn('ChatGPT: still 401/403 after refresh. Session may be invalid. Run: reup auth chatgpt');
+          logger.warn('ChatGPT: still 401/403 after refresh. Session may be invalid.');
           return null;
         }
-        // Token expired, try refresh once
         logger.info('🔄 Token bị reject, thử refresh...');
         this._accessToken = null;
         this._accessTokenExpiry = 0;
         const newToken = await this._refreshAccessToken();
         if (!newToken) {
-          logger.warn('ChatGPT session expired. Run: reup auth chatgpt');
+          logger.warn('ChatGPT session expired.');
           return null;
         }
-        // Retry with new token (once only)
         return this.chatgpt(prompt, { ...options, _retried: true });
       }
 
