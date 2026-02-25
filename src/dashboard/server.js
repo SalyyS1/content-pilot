@@ -622,7 +622,7 @@ export function startDashboard(options = {}) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           client_id: data.google.clientId,
-          scope: 'openid email profile',
+          scope: 'openid email profile https://www.googleapis.com/auth/generative-language',
         }),
       });
 
