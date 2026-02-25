@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
-import { resolve, basename, join } from 'path';
+import { resolve as pathResolve, basename, join } from 'path';
 import config from '../core/config.js';
 import logger from '../core/logger.js';
 import { addVideo, getVideoByUrl, updateVideo } from '../core/database.js';
@@ -22,7 +22,7 @@ export class YouTubeDownloader {
   }
 
   _loadProxies() {
-    const proxyFile = resolve(process.cwd(), 'data', 'socks5.txt');
+    const proxyFile = pathResolve(process.cwd(), 'data', 'socks5.txt');
     if (existsSync(proxyFile)) {
       try {
         const lines = readFileSync(proxyFile, 'utf8').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
@@ -93,7 +93,7 @@ export class YouTubeDownloader {
     const videoId = dbResult.lastInsertRowid || (existing && existing.id);
 
     try {
-      const outputTemplate = resolve(this.outputDir, '%(id)s.%(ext)s');
+      const outputTemplate = pathResolve(this.outputDir, '%(id)s.%(ext)s');
       const filePath = await this._runYtdlp([
         url,
         '-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
@@ -106,8 +106,8 @@ export class YouTubeDownloader {
       ]);
 
       // Find the downloaded file
-      const videoFile = resolve(this.outputDir, `${metadata.id}.mp4`);
-      const thumbFile = resolve(this.outputDir, `${metadata.id}.jpg`);
+      const videoFile = pathResolve(this.outputDir, `${metadata.id}.mp4`);
+      const thumbFile = pathResolve(this.outputDir, `${metadata.id}.jpg`);
 
       updateVideo(videoId, {
         file_path: videoFile,
@@ -217,75 +217,86 @@ export class YouTubeDownloader {
   }
 
   /**
-   * Download by niche configuration — format-specific content scanning
-   * This is the main method used by autopilot for niche-based downloading
+   * Download by niche — PERSISTENT search: shuffles ALL queries, retries
+   * up to 3 rounds with different keywords. Never gives up after 1 empty search.
    */
   async downloadByNiche(format, cycleIndex = 0, options = {}) {
     const niche = getNicheConfig(format);
     const formatType = getFormatType(format);
-    const queries = getCycleQueries(format, cycleIndex);
     const limit = options.limit || 3;
 
+    // Use ALL queries (not just cycle subset), shuffle them
+    const allQueries = [...niche.searchQueries].sort(() => Math.random() - 0.5);
+    
     logger.info(`🎯 Niche scan: ${niche.name} (${format})`);
-    logger.info(`   Queries: ${queries.join(' | ')}`);
+    logger.info(`   ${allQueries.length} keywords available, searching until found...`);
     logger.info(`   Region: ${niche.region}, Language: ${niche.language}`);
 
     const allUrls = [];
+    const maxRounds = 3; // Try up to 3 full rounds
+    let round = 0;
 
-    for (const q of queries) {
-      if (allUrls.length >= limit) break;
-      try {
-        const searchQuery = formatType === 'long' ? q : `${q} #shorts`;
-        const urls = await this._searchVideos(searchQuery, niche.region, limit - allUrls.length, formatType);
-        allUrls.push(...urls);
-      } catch (error) {
-        logger.warn(`Search failed for "${q}": ${error.message}`);
+    while (allUrls.length < limit && round < maxRounds) {
+      round++;
+      const queriesThisRound = round === 1 ? allQueries : allQueries.sort(() => Math.random() - 0.5);
+      
+      for (const q of queriesThisRound) {
+        if (allUrls.length >= limit) break;
+        try {
+          const searchQuery = formatType === 'long' ? q : `${q} #shorts`;
+          logger.info(`🔍 [Round ${round}] Searching: "${searchQuery}"`);
+          const urls = await this._searchVideos(searchQuery, niche.region, limit - allUrls.length, formatType);
+          
+          // Only add new URLs
+          for (const u of urls) {
+            if (!allUrls.includes(u) && !getVideoByUrl(u)) {
+              allUrls.push(u);
+            }
+          }
+          
+          if (urls.length > 0) {
+            logger.info(`   ✅ Found ${urls.length} results (total: ${allUrls.length})`);
+          }
+        } catch (error) {
+          logger.warn(`Search failed for "${q}": ${error.message}`);
+        }
+        
+        // Small delay between searches to avoid rate limiting
+        if (allUrls.length < limit) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+      
+      if (allUrls.length === 0 && round < maxRounds) {
+        logger.info(`⏳ Round ${round} found nothing, trying round ${round + 1}...`);
       }
     }
 
-    // Deduplicate
-    const uniqueUrls = [...new Set(allUrls)];
-    logger.info(`Found ${uniqueUrls.length} unique ${niche.name} videos`);
+    logger.info(`Found ${allUrls.length} unique ${niche.name} videos after ${round} round(s)`);
 
-    // Download with niche-specific filters
+    // Download with relaxed filters
     const results = [];
-    const { minViews = 5000, maxDuration, minDuration } = niche.filters;
+    const { maxDuration } = niche.filters;
 
-    for (const url of uniqueUrls.slice(0, limit)) {
+    for (const url of allUrls.slice(0, limit)) {
       try {
-        const existing = getVideoByUrl(url);
-        if (existing) {
-          logger.debug(`Skipping already known: ${url}`);
-          continue;
-        }
-
         const metadata = await this.getMetadata(url);
         if (!metadata) continue;
 
-        // Apply niche-specific filters
-        if (metadata.view_count < minViews) {
-          logger.debug(`Skipping low views (${metadata.view_count}): ${url}`);
-          continue;
-        }
         if (maxDuration && metadata.duration > maxDuration) {
           logger.debug(`Skipping too long (${metadata.duration}s): ${url}`);
           continue;
         }
-        if (minDuration && metadata.duration < minDuration) {
-          logger.debug(`Skipping too short (${metadata.duration}s): ${url}`);
-          continue;
-        }
 
-        const downloadOpts = {
+        const result = await this.download(url, {
           force: false,
           maxDuration: maxDuration || 180,
           niche: format,
-        };
-
-        const result = await this.download(url, downloadOpts);
+        });
         result.niche = format;
         result.nicheProfile = niche;
         results.push(result);
+        logger.info(`✅ Downloaded: ${metadata.title?.slice(0, 60)}`);
       } catch (error) {
         logger.warn(`Failed to process ${url}: ${error.message}`);
       }
@@ -424,7 +435,7 @@ export class YouTubeDownloader {
       const fullArgs = ['--js-runtimes', 'node', '--extractor-retries', '3', ...args];
 
       // Add cookies file if exists (bypasses YouTube 429 rate limit)
-      const cookieFile = resolve(process.cwd(), 'data', 'youtube-cookies.txt');
+      const cookieFile = pathResolve(process.cwd(), 'data', 'youtube-cookies.txt');
       if (existsSync(cookieFile)) {
         fullArgs.unshift('--cookies', cookieFile);
       }

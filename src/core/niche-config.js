@@ -81,51 +81,53 @@ const NICHE_PROFILES = {
   // Facebook Reels — Mixed Street Food + Audio (VN)
   // ==========================================
   facebook_reels: {
-    name: 'Ẩm Thực Đường Phố',
-    language: 'vi',
-    region: 'VN',
+    name: 'Food & Cooking',
+    language: 'en',
+    region: 'US',
     searchQueries: [
-      // YouTube sources (yt-dlp search)
-      'ẩm thực đường phố việt nam',
-      'street food vietnam shorts',
-      'nấu ăn ngon shorts',
-      'đồ ăn vặt ngon shorts',
-      'ẩm thực hà nội shorts',
-      'ẩm thực sài gòn shorts',
-      'mukbang vietnam shorts',
-      'review đồ ăn shorts',
-      // Viral mix
-      'funny moments viral shorts',
-      'satisfying food shorts',
+      // Simple, high-volume English keywords
+      'food shorts',
+      'cooking shorts',
+      'recipe shorts viral',
+      'street food',
+      'satisfying food',
+      'food asmr shorts',
+      'cooking hack shorts',
+      'easy recipe shorts',
+      'food review shorts',
+      'mukbang shorts',
+      'kitchen hack viral',
+      'chef cooking shorts',
+      'delicious food shorts',
+      'food compilation',
+      'baking shorts viral',
     ],
     // Facebook Reels pages — yt-dlp can download from these directly
     facebookSources: [
       'https://www.facebook.com/reel/',
       'https://www.facebook.com/watch/',
     ],
-    // Facebook Reels search keywords (for scraping)
     facebookSearchQueries: [
-      'ẩm thực đường phố',
-      'street food vietnam',
-      'nấu ăn ngon',
-      'đồ ăn vặt viral',
-      'mukbang vietnam',
+      'food shorts',
+      'cooking viral',
+      'street food',
+      'recipe easy',
+      'mukbang',
     ],
-    queriesPerCycle: 3,
+    queriesPerCycle: 5,
     filters: {
       maxDuration: 90,       // Reels < 90s
-      minViews: 3000,
+      minViews: 1000,        // Relaxed — easier to find videos
       sortBy: 'relevance',
     },
-    // Audio mixing: overlay background music on food clips
     audioMix: true,
     audioMixSources: [
       'upbeat cooking music',
       'cheerful background music no copyright',
-      'vietnamese background music',
+      'lofi cooking background music',
     ],
-    seoKeywords: ['ẩm thực', 'đường phố', 'nấu ăn', 'review đồ ăn', 'street food'],
-    seoHashtags: ['#ẩmthực', '#streetfood', '#đồăn', '#nấuăn', '#viral', '#reels'],
+    seoKeywords: ['food', 'cooking', 'recipe', 'street food', 'delicious', 'viral'],
+    seoHashtags: ['#food', '#cooking', '#recipe', '#streetfood', '#viral', '#shorts', '#reels', '#foodie'],
     channels: [],
   },
 };
