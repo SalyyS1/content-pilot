@@ -89,7 +89,7 @@ async function validateFacebookCookies(cookieString) {
   // Check mbasic.facebook.com with mobile UA (same as posting code) for accurate results
   const headers = {
     'Cookie': cookieString,
-    'User-Agent': 'Mozilla/5.0 (Linux; U; Android 4.4.2; en-us; SCH-I535 Build/KOT49H) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml',
     'Accept-Language': 'en-US,en;q=0.9',
   };

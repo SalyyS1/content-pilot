@@ -305,19 +305,40 @@ IMPORTANT: ONLY return the story text. No meta commentary.`;
   async _postTextOnly(cookieString, text) {
     try {
       const headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; U; Android 4.4.2; en-us; SCH-I535 Build/KOT49H) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
         'Cookie': cookieString,
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
       };
 
-      // GET mbasic homepage → extract fb_dtsg + compose form
-      const homeRes = await fetch('https://mbasic.facebook.com/', { headers, redirect: 'follow' });
-      const homeHtml = await homeRes.text();
+      // Extract c_user ID from cookie to access profile directly
+      const cUserMatch = cookieString.match(/c_user=(\d+)/);
+      const cUserId = cUserMatch ? cUserMatch[1] : null;
 
-      // Extract fb_dtsg
-      const dtsgMatch = homeHtml.match(/name="fb_dtsg"\s+value="([^"]+)"/)
-        || homeHtml.match(/fb_dtsg.*?value="([^"]+)"/s);
+      // Try profile page first (always has composer), fallback to homepage
+      const urls = [
+        cUserId ? `https://mbasic.facebook.com/${cUserId}` : null,
+        'https://mbasic.facebook.com/home.php',
+        'https://mbasic.facebook.com/',
+      ].filter(Boolean);
+
+      let homeHtml = '';
+      let dtsgMatch = null;
+
+      for (const url of urls) {
+        logger.debug(`Trying mbasic page: ${url}`);
+        const res = await fetch(url, { headers, redirect: 'follow' });
+        homeHtml = await res.text();
+
+        dtsgMatch = homeHtml.match(/name="fb_dtsg"\s+value="([^"]+)"/)
+          || homeHtml.match(/fb_dtsg.*?value="([^"]+)"/s);
+
+        if (dtsgMatch) {
+          logger.debug(`Found fb_dtsg on ${url}`);
+          break;
+        }
+      }
+
       if (!dtsgMatch) {
         throw new Error('Could not find fb_dtsg — cookie may be expired');
       }
@@ -325,7 +346,13 @@ IMPORTANT: ONLY return the story text. No meta commentary.`;
 
       // Extract compose form action
       const formMatch = homeHtml.match(/action="(\/composer\/mbasic\/[^"]+)"/);
-      const formAction = formMatch ? formMatch[1].replace(/&amp;/g, '&') : '/composer/mbasic/';
+      let formAction;
+      if (formMatch) {
+        formAction = formMatch[1].replace(/&amp;/g, '&');
+      } else {
+        // Construct composer URL manually using c_user ID
+        formAction = `/composer/mbasic/?csid=${cUserId || ''}&av=${cUserId || ''}&refid=17`;
+      }
 
       // Extract additional hidden fields
       const jazoestMatch = homeHtml.match(/name="jazoest"\s+value="([^"]+)"/);
@@ -369,7 +396,7 @@ IMPORTANT: ONLY return the story text. No meta commentary.`;
   async _postWithImage(cookieString, text, imageBuffer) {
     try {
       const headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; U; Android 4.4.2; en-us; SCH-I535 Build/KOT49H) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
         'Cookie': cookieString,
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
