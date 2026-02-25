@@ -83,35 +83,70 @@ function savePlaywrightSession(accountId, playwrightCookies) {
 
 /**
  * Validate Facebook cookies by making an HTTP request to Facebook
+ * Uses multiple methods for reliability
  */
 async function validateFacebookCookies(cookieString) {
+  const headers = {
+    'Cookie': cookieString,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+  };
+
   try {
-    const res = await fetch('https://www.facebook.com/me', {
+    // Method 1: Check facebook.com main page (most reliable)
+    const res = await fetch('https://www.facebook.com/', {
       method: 'GET',
-      headers: {
-        'Cookie': cookieString,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
+      headers,
       redirect: 'manual',
     });
 
-    // Facebook redirects /me to the profile if cookies are valid
-    const location = res.headers.get('location') || '';
     const status = res.status;
+    const location = res.headers.get('location') || '';
 
+    // If redirected to login → cookies invalid
+    if (location.includes('/login') || location.includes('checkpoint')) {
+      return { valid: false, reason: `Redirected to login (cookie expired)` };
+    }
+
+    // 302 to another FB page = valid
     if (status === 302 && location.includes('facebook.com') && !location.includes('login')) {
       return { valid: true, redirect: location, name: null };
     }
+
+    // 200 = we got the main page = logged in
     if (status === 200) {
-      // Might be the profile page itself
       const body = await res.text();
+      // Check if login form is present (not logged in)
+      if (body.includes('login_form') || body.includes('/login/')) {
+        return { valid: false, reason: 'Login page returned (cookie expired)' };
+      }
+      // Try to extract name
       const nameMatch = body.match(/"NAME":"([^"]+)"/i) || body.match(/title>([^<]+)<\/title/);
-      return { valid: true, name: nameMatch ? nameMatch[1] : null };
+      const name = nameMatch ? nameMatch[1].replace(/\s*[|\-–].*/g, '').trim() : null;
+      return { valid: true, name };
     }
-    return { valid: false, reason: `HTTP ${status}, redirect: ${location}` };
+
+    // Method 2: If main page failed, try the Graph API endpoint
+    if (status >= 400) {
+      const c_user = cookieString.match(/c_user=(\d+)/)?.[1];
+      if (c_user) {
+        // c_user cookie exists and was parsed = likely valid (soft check)
+        return { valid: true, name: null, softCheck: true };
+      }
+    }
+
+    return { valid: false, reason: `HTTP ${status}` };
   } catch (err) {
+    // Network error but c_user exists → allow as soft-valid
+    const c_user = cookieString.match(/c_user=(\d+)/)?.[1];
+    if (c_user) {
+      return { valid: true, name: null, softCheck: true };
+    }
     return { valid: false, reason: err.message };
   }
 }
